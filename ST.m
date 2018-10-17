@@ -12,24 +12,24 @@ function [ETA XMASSFLOW DATEN DATEX DAT MASSFLOW COMBUSTION FIG] = ST(P_e,option
 % OPTIONS is a structure containing :
 %   -options.nsout     [-] : Number of feed-heating 
 %   -options.reheat    [-] : Number of reheating
-%   -options.T_max     [°C] : Maximum steam temperature
-%   -options.T_cond_out[°C] : Condenseur cold outlet temperature
+%   -options.T_max     [Â°C] : Maximum steam temperature
+%   -options.T_cond_out[Â°C] : Condenseur cold outlet temperature
 %   -options.p3_hp     [bar] : Maximum pressure
 %   -options.drumFlag  [-] : if =1 then drum if =0 => no drum. 
 %   -options.eta_mec   [-] : mecanic efficiency of shafts bearings
 %   -options.comb is a structure containing combustion data : 
-%       -comb.Tmax     [°C] : maximum combustion temperature
+%       -comb.Tmax     [Â°C] : maximum combustion temperature
 %       -comb.lambda   [-] : air excess
 %       -comb.x        [-] : the ratio O_x/C. Example 0.05 in CH_1.2O_0.05
 %       -comb.y        [-] : the ratio H_y/C. Example 1.2 in CH_1.2O_0.05
-%   -options.T_exhaust [°C] : Temperature of exhaust gas out of the chimney
+%   -options.T_exhaust [Â°C] : Temperature of exhaust gas out of the chimney
 %   -options.p_3       [-] : High pressure after last reheating
 %   -options.x4        [-] : Vapor ratio [gaseous/liquid] (in french : titre)
-%   -options.T_0       [°C] : Reference temperature
-%   -options.TpinchSub [°C] : Temperature pinch at the subcooler
-%   -options.TpinchEx  [°C] : Temperature pinch at a heat exchanger
-%   -options.TpinchCond[°C] : Temperature pinch at condenser 
-%   -options.Tdrum     [°C] : minimal drum temperature
+%   -options.T_0       [Â°C] : Reference temperature
+%   -options.TpinchSub [Â°C] : Temperature pinch at the subcooler
+%   -options.TpinchEx  [Â°C] : Temperature pinch at a heat exchanger
+%   -options.TpinchCond[Â°C] : Temperature pinch at condenser 
+%   -options.Tdrum     [Â°C] : minimal drum temperature
 %   -option.eta_SiC    [-] : Isotrenpic efficiency for compression
 %   -option.eta_SiT    [-] : Isotrenpic efficiency for Turbine. It can be a vector of 2 values :
 %             	             eta_SiT(1)=eta_SiT_HP,eta_SiT(2)=eta_SiT_others
@@ -64,7 +64,7 @@ function [ETA XMASSFLOW DATEN DATEX DAT MASSFLOW COMBUSTION FIG] = ST(P_e,option
 %   -datex(6) : perte_chemex [kW]
 %   -datex(7) : perte_transex[kW]
 % DAT is a matrix containing :
-% dat = {T_1       , T_2       , ...       , T_6_I,     T_6_II, ... ;  [°C]
+% dat = {T_1       , T_2       , ...       , T_6_I,     T_6_II, ... ;  [Â°C]
 %        p_1       , p_2       , ...       , p_6_I,     p_6_II, ... ;  [bar]
 %        h_1       , h_2       , ...       , h_6_I,     h_6_II, ... ;  [kJ/kg]
 %        s_1       , s_2       , ...       , s_6_I,     s_6_II, ... ;  [kJ/kg/K]
@@ -102,22 +102,114 @@ function [ETA XMASSFLOW DATEN DATEX DAT MASSFLOW COMBUSTION FIG] = ST(P_e,option
 
 % Exemple of how to use 'nargin' to check your number of inputs
 if nargin<3
-    display = 1;
+    display = 0;
     if nargin<2
         options = struct();
         if nargin<1
-            P_e = 250e3; % [kW] Puissance énergétique de l'installation
+            P_e = 500e3; % [kW] Puissance Ã©nergÃ©tique de l'installation
         end
     end
 end
 
 
-% Exemple of how to use (isfield' to check if an option has been given (or
-% not)
+%% Initial conditions check
+
+if isfield(options,'nsout')
+    nsout = options.nsout;
+else
+    nsout = 1;  % [-]
+end
+if isfield(options,'reheat')
+    reheat = options.reheat;
+else
+    reheat = 1;  % [-]
+end
+if isfield(options,'T_max')
+    T_max = options.T_max;
+else
+    T_max = 525;  % [C]
+end
+% TCOND_OUT ?
+if isfield(options,'p3_hp')
+    p3_hp = options.p3_hp;
+else
+    p3_hp = 200;  % [bar]
+end
+if isfield(options,'drumFlag')
+    drumFlag = options.drumFlag;
+else
+    drumFlag = 1;  % [-]
+end
+if isfield(options,'eta_mec')
+    eta_mec = options.eta_mec;
+else
+    eta_mec = 0.98;  % [-]
+end
+
+% COMBUSTION & EXHAUST
+
+if isfield(options,'p3')
+    p3 = options.p3;
+else
+    switch reheat
+        case 1
+            p3 = 0.14*p3_hp; % Livre p85 : rapport optimal
+        case 0
+            p3 = 0; % Pas de resurchauffe
+        case 2
+            p3 = 0; % A DEFINIR
+        otherwise
+            error('A maximum of 2 reheats are allowed.');
+    end
+end
+if isfield(options,'x4')
+    x4 = options.x4;
+else
+    x4 = 0.89;  % [-]
+end
 if isfield(options,'T_0')
     T_0 = options.T_0;
 else
-    T_0 = 288.15;  % [éC]
+    T_0 = 15.0;  % [C]
+end
+
+if isfield(options,'TPinchSub')
+    TPinchSub = options.TPinchSub;
+else
+    TPinchSub = 15.0;  % [C] % PAS FINI
+end
+if isfield(options,'TPinchEx')
+    TPinchEx = options.TPinchEx;
+else
+    TPinchEx = 15.0;  % [C] % PAS FINI
+end
+if isfield(options,'TPinchSub')
+    TPinchCond = options.TPinchCond;
+else
+    TPinchCond = 15.0;  % [C] % PAS FINI
+end
+if isfield(options,'TDrum')
+    TDrum = options.TDrum;
+else
+    TDrum = 15.0;  % [C] % PAS FINI
+end
+
+
+if isfield(options,'eta_SiC')
+    eta_SiC = options.eta_SiC;
+else
+    eta_SiC = 0.9;  % [-]
+end
+if isfield(options,'eta_SiT')
+    eta_SiT(1) = options.eta_SiT(1);
+else
+    eta_SiT = [0.9 0.9]; % 2nd is changing during calculation, according to BAUMAN'S RULE 
+end
+
+if isfield(options,'T_cond_out')
+    T_cond_out = options.T_cond_out;
+else
+    T_cond_out = TPinchCond + T_0;  % [C]
 end
 
 end
