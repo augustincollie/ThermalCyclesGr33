@@ -145,9 +145,31 @@ if isfield(options,'eta_mec')
 else
     eta_mec = 0.98;  % [-]
 end
-
-% COMBUSTION & EXHAUST
-
+if isfield(options,'comb.Tmax')
+    comb.Tmax = options.comb.Tmax;
+else
+    comb.Tmax = 0;  % A FAIRE
+end
+if isfield(options,'comb.lambda')
+    comb.lambda = options.comb.lambda;
+else
+    comb.lambda = 1.1;  % A FAIRE
+end
+if isfield(options,'comb.x')
+    comb.x = options.comb.x;
+else
+    comb.x = 0;  % [O/C]
+end
+if isfield(options,'comb.y')
+    comb.y = options.comb.y;
+else
+    comb.y = 4;  % [H/C]
+end
+if isfield(options,'T_exhaust')
+    T_exhaust = options.T_exhaust;
+else
+    T_exhaust = 0;  % A FAIRE
+end
 if isfield(options,'p3')
     p3 = options.p3;
 else
