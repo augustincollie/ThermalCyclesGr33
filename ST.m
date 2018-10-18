@@ -98,11 +98,11 @@ function [ETA XMASSFLOW DATEN DATEX DAT MASSFLOW COMBUSTION FIG] = ST(P_e,option
 %  Your vector FIG will contain all the figure plot during the run of this
 %  code (whatever the size of FIG).
 
-%% YOUR WORK
+%% Conditions initiales
 
-% Exemple of how to use 'nargin' to check your number of inputs
+
 if nargin<3
-    display = 0;
+    display = 1;
     if nargin<2
         options = struct();
         if nargin<1
@@ -112,104 +112,245 @@ if nargin<3
 end
 
 
-%% Initial conditions check
-
-if isfield(options,'nsout')
-    nsout = options.nsout;
-else
-    nsout = 1;  % [-]
-end
-if isfield(options,'reheat')
-    reheat = options.reheat;
-else
-    reheat = 1;  % [-]
-end
-if isfield(options,'T_max')
-    T_max = options.T_max;
-else
-    T_max = 525;  % [C]
-end
-% TCOND_OUT ?
-if isfield(options,'p3_hp')
-    p3_hp = options.p3_hp;
-else
-    p3_hp = 200;  % [bar]
-end
-if isfield(options,'drumFlag')
-    drumFlag = options.drumFlag;
-else
-    drumFlag = 1;  % [-]
-end
-if isfield(options,'eta_mec')
-    eta_mec = options.eta_mec;
-else
-    eta_mec = 0.98;  % [-]
-end
-
-% COMBUSTION & EXHAUST
-
-if isfield(options,'p3')
-    p3 = options.p3;
-else
-    switch reheat
-        case 1
-            p3 = 0.14*p3_hp; % Livre p85 : rapport optimal
-        case 0
-            p3 = 0; % Pas de resurchauffe
-        case 2
-            p3 = 0; % A DEFINIR
-        otherwise
-            error('A maximum of 2 reheats are allowed.');
+% Importation des options
+for d = 1 %Useless loop to fold up initial conditions
+    if isfield(options,'nsout')
+        nsout = options.nsout;
+    else
+        nsout = 1;  % [-]
     end
-end
-if isfield(options,'x4')
-    x4 = options.x4;
-else
-    x4 = 0.89;  % [-]
-end
-if isfield(options,'T_0')
-    T_0 = options.T_0;
-else
-    T_0 = 15.0;  % [C]
+    if isfield(options,'reheat')
+        reheat = options.reheat;
+    else
+        reheat = 1;  % [-]
+    end
+    if isfield(options,'T_max')
+        T_max = options.T_max;
+    else
+        T_max = 525;  % [C]
+    end
+    % TCOND_OUT ?
+    if isfield(options,'p3_hp')
+        p3_hp = options.p3_hp;
+    else
+        p3_hp = 200;  % [bar]
+    end
+    if isfield(options,'drumFlag')
+        drumFlag = options.drumFlag;
+    else
+        drumFlag = 1;  % [-]
+    end
+    if isfield(options,'eta_mec')
+        eta_mec = options.eta_mec;
+    else
+        eta_mec = 0.98;  % [-]
+    end
+    if isfield(options,'comb.Tmax')
+        comb.Tmax = options.comb.Tmax;
+    else
+        comb_Tmax = 0;  % A FAIRE
+    end
+    if isfield(options,'comb.lambda')
+        comb_lambda = options.comb.lambda;
+    else
+        comb_lambda = 1.1;  % A FAIRE
+    end
+    if isfield(options,'comb.x')
+        comb_x = options.comb.x;
+    else
+        comb_x = 0;  % [O/C]
+    end
+    if isfield(options,'comb.y')
+        comb_y = options.comb.y;
+    else
+        comb_y = 4;  % [H/C]
+    end
+    if isfield(options,'T_exhaust')
+        T_exhaust = options.T_exhaust;
+    else
+        T_exhaust = 0;  % A FAIRE
+    end
+    if isfield(options,'p3')
+        p3 = options.p3;
+    else
+        switch reheat
+            case 1
+                p3 = 0.14*p3_hp; % Livre p85 : rapport optimal
+            case 0
+                p3 = 0; % Pas de resurchauffe
+            case 2
+                p3 = 0; % A DEFINIR
+            otherwise
+                error('A maximum of 2 reheats are allowed.');
+        end
+    end
+    if isfield(options,'x4')
+        x4 = options.x4;
+    else
+        x4 = 0.89;  % [-]
+    end
+    if isfield(options,'T_0')
+        T_0 = options.T_0;
+    else
+        T_0 = 15.0;  % [C]
+    end
+
+    if isfield(options,'TPinchSub')
+        TPinchSub = options.TPinchSub;
+    else
+        TPinchSub = 15.0;  % [C] % PAS FINI
+    end
+    if isfield(options,'TPinchEx')
+        TPinchEx = options.TPinchEx;
+    else
+        TPinchEx = 15.0;  % [C] % PAS FINI
+    end
+    if isfield(options,'TPinchSub')
+        TPinchCond = options.TPinchCond;
+    else
+        TPinchCond = 15.0;  % [C] % PAS FINI
+    end
+    if isfield(options,'TDrum')
+        TDrum = options.TDrum;
+    else
+        TDrum = 15.0;  % [C] % PAS FINI
+    end
+
+
+    if isfield(options,'eta_SiC')
+        eta_SiC = options.eta_SiC;
+    else
+        eta_SiC = 0.9;  % [-]
+    end
+    if isfield(options,'eta_SiT')
+        eta_SiT(1) = options.eta_SiT(1);
+    else
+        eta_SiT = [0.9 0.9]; % [/]
+    end
+% A REFAIRE
+%     if isfield(options,'T_cond_out')
+%         T_cond_out = options.T_cond_out;
+%     else
+%         T_cond_out = TPinchCond + T_0;  % [C]
+%     end
 end
 
-if isfield(options,'TPinchSub')
-    TPinchSub = options.TPinchSub;
-else
-    TPinchSub = 15.0;  % [C] % PAS FINI
-end
-if isfield(options,'TPinchEx')
-    TPinchEx = options.TPinchEx;
-else
-    TPinchEx = 15.0;  % [C] % PAS FINI
-end
-if isfield(options,'TPinchSub')
-    TPinchCond = options.TPinchCond;
-else
-    TPinchCond = 15.0;  % [C] % PAS FINI
-end
-if isfield(options,'TDrum')
-    TDrum = options.TDrum;
-else
-    TDrum = 15.0;  % [C] % PAS FINI
+%% Partie 1 : ch. comb. -> sortie turb. BP -> sortie condenseur
+
+%Vecteurs des etats pour le passage dans les turbines
+% L1 & L2 : non definis dans cette partie
+% L3 : entree HP
+% L4 : sortie HP
+% L5 : entree MP apres resurchauffe
+% L6 : sortie BP
+% L7 : sortie condenseur
+p = zeros(1,7); % [p,t,x,s,h,e]
+t = p;
+x = p; % x = NaN si vapeur surchauffe ou liquide sous-refroidi 
+s = p;
+h = p;
+e = p;
+
+% Initialisation de la matrice avec les donnees initiales
+p(3) = p3_hp;
+p(5) = p3;
+p(4) = p(5);
+t(3) = T_max;
+t(5) = T_max;
+x(7) = 0;
+t(7) = T_0 + TPinchCond;
+t(6) = T_0 + TPinchCond;
+p(7) = XSteam('psat_T',t(7));
+p(6) = p(7);
+
+    % Calcul Etat 3
+    h(3) = XSteam('h_pT',p(3),t(3));
+    s(3) = XSteam('s_pT',p(3),t(3));
+    x(3) = XSteam('x_ph',p(3),h(3));
+    e(3) = Exergie(h(3),s(3));
+
+
+    % RESURCHAUFFE
+    if reheat == 1
+        % Calcul Etat 4
+        s4s = s(3);
+        h4s = XSteam('h_ps',p(4),s4s);
+        h(4) = h(3) - eta_SiT(1)*(h(3) - h4s);
+        t(4) = XSteam('T_ph',p(4),h(4));
+        s(4) = XSteam('s_ph',p(4),h(4));
+        x(4) = XSteam('x_ph',p(4),h(4));
+        e(4) = Exergie(h(4),s(4));
+
+        % Calcul Etat 5 : t et p connus
+        h(5) = XSteam('h_pT',p(5),t(5));
+        s(5) = XSteam('s_ph',p(5),h(5));
+        x(5) = XSteam('x_ph',p(5),h(5));        
+        e(5) = Exergie(h(5),s(5));
+
+    elseif reheat == 0
+        % On zappe les etats 4 et 5
+        p([4 5]) = [NaN p(3)];
+        t([4 5]) = [NaN t(3)];
+        x([4 5]) = [NaN x(3)];
+        s([4 5]) = [NaN s(3)];
+        h([4 5]) = [NaN h(3)];
+        e([4 5]) = [NaN e(3)];
+    end
+
+    % SORTIE DE TURBINE BP
+    % Calcul Etat 6
+    s6s = s(5);
+    x6s = XSteam('x_ps',p(6),s6s);
+    h6s = XSteam('h_px',p(6),x6s);
+    h(6) = h(5) - eta_SiT(2)*(h(5) - h6s);
+    x(6) = XSteam('x_ph',p(6),h(6));
+    t(6) = XSteam('T_ph',p(6),h(6));
+    s(6) = XSteam('s_ph',p(6),h(6));
+    e(6) = Exergie(h(6),s(6));
+    % Verification du titre
+    if ISNAN(x(6))
+        error('ERREUR : Le titre en sortie de turbine BP est > 1');
+    end
+    if x(6) < 0.88
+        error('ERREUR : Le titre en sortie de turbine BP est < 0.88');
+    end
+
+    % SORTIE DE CONDENSEUR
+    % Calcul Etat 7 - p,t,x connus - etat liquide
+    s(7) = XSteam('sL_T',t(7));
+    h(7) = XSteam('hL_T',t(7));
+
+%% Soutirages : Sortie de cond. -> Sortie de pompe alim.
+
+    switch nsout
+        case 0 % Pas de soutirage - court-circuitage comme cycle Rankin-Hirn
+        p(1) = p(7);
+        t(1) = t(7);
+        x(1) = x(7);
+        s(1) = s(7);
+        h(1) = h(7);
+        e(1) = e(7);
+        case 1 % Soutirage obligatoire en sortie de HP
+            % TO DO
+        case 2 % Soutirage en sortie de HP et MP ?? (reheat == 2)
+            % TO DO - sot sure !
+        otherwise
+            % TO DO
+    end
+    
+    % Pompe alimentaire
+    p(2) = p(3);
+    % TO DO
+
 end
 
 
-if isfield(options,'eta_SiC')
-    eta_SiC = options.eta_SiC;
-else
-    eta_SiC = 0.9;  % [-]
-end
-if isfield(options,'eta_SiT')
-    eta_SiT(1) = options.eta_SiT(1);
-else
-    eta_SiT = [0.9 0.9]; % 2nd is changing during calculation, according to BAUMAN'S RULE 
-end
-
-if isfield(options,'T_cond_out')
-    T_cond_out = options.T_cond_out;
-else
-    T_cond_out = TPinchCond + T_0;  % [C]
-end
-
+% Retourne l'exergie a un etat donne comme une difference avec 
+% INPUT = - etat : vecteur contenant les variables associees a cet etat
+% (p,t,x,s,h)
+% OUTPUT : - e : exergie de l'etat [kJ/kg], comparee a l'exergie à 15°C
+function e = Exergie(h , s)
+    h0= XSteam('hL_T',T_0);
+    s0= XSteam('sL_T',T_0);
+    e = (h-h0) - T_0*(s-s0); 
 end
