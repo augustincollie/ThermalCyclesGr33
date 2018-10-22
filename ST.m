@@ -251,7 +251,7 @@ s = p;
 h = p;
 e = p;
 
-% Initialisation de la matrice avec les donnees initiales
+% Initialisation des vecteurs avec les donnees initiales
 p(3) = p3_hp;
 p(5) = p3;
 p(4) = p(5);
@@ -340,8 +340,14 @@ p(6) = p(7);
     
     % Pompe alimentaire
     p(2) = p(3);
-    % TO DO
-
+    s2s = s(1);
+    h2s = XSteam('h_ps',p(2),s2s);
+    h(2) = h(1) + (h2s-h(1))/eta_SiC;
+    s(2) = XSteam('s_ph',p(2),h(2));
+    t(2) = t(1) + ((h(2)-h(1)) - (p(2)-p(1))*Give_muT(t(1))) / XSteam('Cp_ph',p(2),h(2));
+    x(2) = XSteam('x_ph',p(2),h(2));
+    e(2) = exergy(h(2),s(2));
+    
 end
 
 
