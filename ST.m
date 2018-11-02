@@ -348,6 +348,30 @@ p(6) = p(7);
     x(2) = XSteam('x_ph',p(2),h(2));
     e(2) = exergy(h(2),s(2));
     
+    %CHAMBRE DE COMBUSTION
+    % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
+    % chaleur entre le combustible (CH4) et l'eau du circuit.
+    
+    %Données utiles
+    Tsat_p2 = XSteam('Tsat_p',p(2));
+    h_2prime = XSteam('hL_p',p(2));
+    h_2secnd = XSteam('hV_p',p(2));
+    hLV_p2 = (h_2secnd - h_2prime);
+    s_2prime = XSteam('sL_p',p(2));
+    s_2scnd = XSteam('sV_p',p(2));
+    combustion.LHV = 50.15; % [MJ/kg] Pouvoir Calorifique Inférieur du Méthane
+    
+    %Vecteurs de résultats
+    t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
+    p_exch = p(2);
+    h_exch = [h(2), h_2prime, h_2secnd, h(3)];
+    s_exch = [s(2), s_2prime, s_2secnd, s(3)];
+    e_exch = Exergie(h_exch,s_exch);
+    x_exch = [x(2), 0, 1, x(3)];
+    
+    %Calcul de l'échange de chaleur à l'échangeur (delta_h)
+    dh_exch = (h_exch(2)-h_exch(1))+(hLV_p2)+(h_exch(3)-h_exch(4));
+    
 end
 
 
