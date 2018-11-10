@@ -348,7 +348,8 @@ p(6) = p(7);
     x(2) = XSteam('x_ph',p(2),h(2));
     e(2) = exergy(h(2),s(2));
     
-    %CHAMBRE DE COMBUSTION
+%% CHAMBRE DE COMBUSTION
+
     % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
     % chaleur entre le combustible (CH4) et l'eau du circuit.
     
@@ -361,7 +362,30 @@ p(6) = p(7);
     s_2scnd = XSteam('sV_p',p(2));
     combustion.LHV = 50.15; % [MJ/kg] Pouvoir Calorifique Inférieur du Méthane
     
-    %Vecteurs de résultats
+    
+    % Masse Molaire des composants [kg/mol]
+
+    M_molO2 = 0.033;
+    M_molCO2 =  0.044;
+    M_molN2 = 0.028;
+    M_molH2O = 0.018;
+    
+    M_molAir = 0.21*M_molO2 + 0.79*M_molN2;
+    
+    %Air -- Comburant 
+    
+    fracMol_O2Air = 0.21*M_mol_O2 / M_molAir;
+    fracMol_N2Air = 0.79*M_mol_N2 / M_molAir;
+    R_air = 8.3145/M_molAir/1000;
+    
+    m_a1 = ((32 + 3.76*28)*(1+((comb_y-2*comb_x)/4)))/(12+comb_y+comb_x*16); % Pouvoir Comburivore
+    
+    %Combustible
+    
+    M_molComb = 0.012 + 0.001*comb_y + 0.016*comb_x;
+        % PCI = ?????????
+    
+    %Vecteurs des états du flux principal
     t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
     p_exch = p(2);
     h_exch = [h(2), h_2prime, h_2secnd, h(3)];
@@ -370,7 +394,77 @@ p(6) = p(7);
     x_exch = [x(2), 0, 1, x(3)];
     
     %Calcul de l'échange de chaleur à l'échangeur (delta_h)
-    dh_exch = (h_exch(2)-h_exch(1))+(hLV_p2)+(h_exch(3)-h_exch(4));
+    dh_exch = [h_exch(2)-h_exch(1), hLV_p2, h_exch(3)-h_exch(4)];
+    
+    %Evaluation de la composition des fumées
+    %comb_y , comb_x, comb_lambda, comb_Tmax
+        
+        %Fractions molaires
+    denom = 1+(comb_y/2)+4.76*comb_lambda*(1+((comb_y-2*comb_x)/4))-(1+((comb_y-2*comb_x)/4));
+    fracMol_CO2f = (1)/denom;
+    fracMol_H2Of = (comb_y/2)/denom;
+    fracMol_O2f = ((comb_lambda-1)*(1+((comb_y-2*comb_x)/4)))/denom;
+    fracMol_N2f = (3.76*comb_lambda*(1+((comb_y-2*comb_x)/4)))/denom;
+        
+        %Fractions massiques des fumées
+    massFum = fracMol_CO2f*M_molCO2 + fracMol_H2Of*M_molH2O + fracMol_O2f*M_molO2 + fracMol_N2f*M_molN2;
+    mass_CO2f = fracMol_CO2f/massFum;
+    mass_H2Of = fracMol_H2Of/massFum;
+    mass_O2f = fracMol_O2f/massFum;
+    mass_N2f = fracMol_N2f/massFum;
+    R_fum = 803145/massFum/1000;
+    
+    
+    %Capacité calorifique des fumées? --> Evaluer le transfert de chaleur
+    %des fumées vers le liquide chauffé.
+    
+        %Calcul du Cp moyen pour chaque gaz d'echappement entre 2 et 2'
+    
+    T_lin1 = linspace(t_exch(1),t_exch(2))
+    c_CO2f = janaf('c','CO2', T_lin1 );
+    c_H2Of = janaf('c','H2O', T_lin1);
+    c_O2f = janaf('c','O2', T_lin1);
+    c_N2f = janaf('c','N2', T_lin1);
+    
+    c_moy_2 = (1/(t_exch(1)-t_exch(2)))*[sum(c_CO2f), sum(c_H2Of), sum(c_O2f), sum(c_N2f)];
+
+        %Estimation de l'enthalpie des fumées entre 2 et 2'
+    
+        % CONTINUE HERE (ref = lignes 356+) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         
+    %Calcul du Cp moyen pour chaque gaz d'echappement entre 2' et 2"
+    
+    c_CO2f = janaf('c','CO2', t_exch(2));
+    c_H2Of = janaf('c','H2O', t_exch(2));
+    c_O2f = janaf('c','O2', t_exch(2));
+    c_N2f = janaf('c','N2', t_exch(2));
+    
+    cp_LV = [c_CO2f, c_H2Of, c_O2f, c_N2f];
+    
+    %Calcul du Cp moyen pour chaque gaz d'echappement entre 2" et 3
+    
+    c_CO2f = janaf('c','CO2', linspace(t_exch(3),t_exch(4)));
+    c_H2Of = janaf('c','H2O', linspace(t_exch(3),t_exch(4)));
+    c_O2f = janaf('c','O2', linspace(t_exch(3),t_exch(4)));
+    c_N2f = janaf('c','N2', linspace(t_exch(3),t_exch(4)));
+    
+    c_moy_2 = (1/t_exch(3)-t_exch(4))*[sum(c_CO2f), sum(c_H2Of), sum(c_O2f), sum(c_N2f)];
+    
+    %Enthalpie des gaz en [kg/mol]
+    
+
+    
+
+    %       -fum(1) = m_O2f  : massflow of O2 in exhaust gas [kg/s]
+%       -fum(2) = m_N2f  : massflow of N2 in exhaust gas [kg/s]
+%       -fum(3) = m_CO2f : massflow of CO2 in exhaust gas [kg/s]
+%       -fum(4) = m_H2Of : massflow of H2O in exhaust gas [kg/s] 
+    
+    
+    %Evaluation du débit de combustible nécessaire à la combustion
+    
+    fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques. 
+    
     
 end
 
