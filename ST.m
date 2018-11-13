@@ -739,7 +739,7 @@ function Lhv = LHV(y,x)
         Lhv = 393400;
     else if (y == 4 && x == 0) % Methane
         Lhv = 802400;
-    else if (y == 8/3 && x == 0) % Octane
+    else if (y == 8/3 && x == 0) % Propane
         Lhv = 2044400;
     else if (y == 0 && x == 1) % Carbon monoxyde
         Lhv = 282400;
