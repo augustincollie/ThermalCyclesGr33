@@ -729,3 +729,18 @@ function e = Exergie(h , s , T0)
     s0= XSteam('sL_T',T0);
     e = (h-h0) - (273.15+T0)*(s-s0); 
 end
+
+%Retourne le PCI d'un combustible du type CH_yO_x selon les données
+%disponibles dans des tables issues du cours LMECA2160 - Combustion and
+%fuels.
+% OUTPUT : - Lhv : PCI du carburant exprimé en [kJ/kmol]
+function Lhv = LHV(y,x)
+    if (y == 0 && x == 0) %Carbon Graphite
+        Lhv = 393400;
+    else if (y == 4 && x == 0) % Methane
+        Lhv = 802400;
+    else if (y == 8/3 && x == 0) % Octane
+        Lhv = 2044400;
+    else if (y == 0 && x == 1) % Carbon monoxyde
+        Lhv = 282400;
+end
