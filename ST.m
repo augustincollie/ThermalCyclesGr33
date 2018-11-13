@@ -1,4 +1,4 @@
-function [ETA XMASSFLOW DATEN DATEX DAT MASSFLOW COMBUSTION FIG] = ST(P_e,options,display)
+function [ETA, XMASSFLOW, DATEN, DATEX, DAT, MASSFLOW, COMBUSTION, FIG] = ST(P_e,options,display)
 % ST Steam power plants modelisation
 % ST(P_e,options,display) compute the thermodynamics states for a Steam
 % power plant (combustion, exchanger, cycle) turbine based on several 
@@ -106,7 +106,7 @@ if nargin<3
     if nargin<2
         options = struct();
         if nargin<1
-            P_e = 500e3; % [kW] Puissance énergétique de l'installation
+            P_e = 500e3; % [kW] Puissance energetique de l'installation
         end
     end
 end
@@ -117,7 +117,7 @@ for d = 1 %Useless loop to fold up initial conditions
     if isfield(options,'nsout')
         nsout = options.nsout;
     else
-        nsout = 1;  % [-]
+        nsout = 8;  % [-]
     end
     if isfield(options,'reheat')
         reheat = options.reheat;
@@ -129,7 +129,6 @@ for d = 1 %Useless loop to fold up initial conditions
     else
         T_max = 525;  % [C]
     end
-    % TCOND_OUT ?
     if isfield(options,'p3_hp')
         p3_hp = options.p3_hp;
     else
@@ -143,17 +142,17 @@ for d = 1 %Useless loop to fold up initial conditions
     if isfield(options,'eta_mec')
         eta_mec = options.eta_mec;
     else
-        eta_mec = 0.98;  % [-]
+        eta_mec = 0.99;  % [-]
     end
     if isfield(options,'comb.Tmax')
-        comb.Tmax = options.comb.Tmax;
+        comb_Tmax = options.comb.Tmax;
     else
-        comb_Tmax = 0;  % A FAIRE
+        comb_Tmax = 1400;  % p.111
     end
     if isfield(options,'comb.lambda')
         comb_lambda = options.comb.lambda;
     else
-        comb_lambda = 1.1;  % A FAIRE
+        comb_lambda = 1.1;  %
     end
     if isfield(options,'comb.x')
         comb_x = options.comb.x;
@@ -198,58 +197,67 @@ for d = 1 %Useless loop to fold up initial conditions
     if isfield(options,'TPinchSub')
         TPinchSub = options.TPinchSub;
     else
-        TPinchSub = 15.0;  % [C] % PAS FINI
+        TPinchSub = 4.0;  % [C]
     end
     if isfield(options,'TPinchEx')
         TPinchEx = options.TPinchEx;
     else
-        TPinchEx = 15.0;  % [C] % PAS FINI
+        TPinchEx = 10.0;  % [C]
     end
     if isfield(options,'TPinchSub')
         TPinchCond = options.TPinchCond;
     else
-        TPinchCond = 15.0;  % [C] % PAS FINI
+        TPinchCond = 15.0;  % [C]
     end
     if isfield(options,'TDrum')
         TDrum = options.TDrum;
     else
         TDrum = 15.0;  % [C] % PAS FINI
     end
-
-
     if isfield(options,'eta_SiC')
         eta_SiC = options.eta_SiC;
     else
         eta_SiC = 0.9;  % [-]
     end
     if isfield(options,'eta_SiT')
-        eta_SiT(1) = options.eta_SiT(1);
+        if isvec(options.eta_SiT)
+            eta_SiT(1) = options.eta_SiT(1);
+            eta_SiT(2) = options.eta_SiT(2);
+        else
+            eta_SiT(1) = options.eta_SiT;
+            eta_SiT(2) = options.eta_SiT;
+        end
     else
         eta_SiT = [0.9 0.9]; % [/]
     end
-% A REFAIRE
-%     if isfield(options,'T_cond_out')
-%         T_cond_out = options.T_cond_out;
-%     else
-%         T_cond_out = TPinchCond + T_0;  % [C]
-%     end
+    if isfield(options,'T_cond_out')
+        T_cond_out = options.T_cond_out;
+    else
+        T_cond_out = TPinchCond + T_0;  % [C]
+    end
 end
 
 %% Partie 1 : ch. comb. -> sortie turb. BP -> sortie condenseur
 
-%Vecteurs des etats pour le passage dans les turbines
-% L1 & L2 : non definis dans cette partie
+% Vecteurs des etats pour le passage dans les turbines
+% L1 : avant Pompe alimentaire
+% L2 : apres Pa
 % L3 : entree HP
 % L4 : sortie HP
 % L5 : entree MP apres resurchauffe
 % L6 : sortie BP
 % L7 : sortie condenseur
-p = zeros(1,7); % [p,t,x,s,h,e]
-t = p;
-x = p; % x = NaN si vapeur surchauffe ou liquide sous-refroidi 
-s = p;
-h = p;
-e = p;
+% L8 : sortie de pompe Pe
+% L9 : de post-Pe a la bache
+% L10 : sortie de bache
+% L11 : post pompe Pb
+% L12 : de post Pb a entrée Pa
+p = zeros(1,11); % [p,t,x,s,h,e]
+t = zeros(1,11);
+x = zeros(1,11); % x = NaN si vapeur surchauffe ou liquide sous-refroidi 
+s = zeros(1,11);
+h = zeros(1,11);
+e = zeros(1,11);
 
 % Initialisation des vecteurs avec les donnees initiales
 p(3) = p3_hp;
@@ -258,96 +266,295 @@ p(4) = p(5);
 t(3) = T_max;
 t(5) = T_max;
 x(7) = 0;
-t(7) = T_0 + TPinchCond;
-t(6) = T_0 + TPinchCond;
+t(7) = T_cond_out;
+t(6) = t(7);
 p(7) = XSteam('psat_T',t(7));
 p(6) = p(7);
 
-    % Calcul Etat 3
-    h(3) = XSteam('h_pT',p(3),t(3));
-    s(3) = XSteam('s_pT',p(3),t(3));
-    x(3) = XSteam('x_ph',p(3),h(3));
-    e(3) = Exergie(h(3),s(3));
+% Calcul Etat 3
+h(3) = XSteam('h_pT',p(3),t(3));
+s(3) = XSteam('s_pT',p(3),t(3));
+x(3) = XSteam('x_ph',p(3),h(3));
+e(3) = Exergie(h(3),s(3),T_0);
 
 
-    % RESURCHAUFFE
-    if reheat == 1
-        % Calcul Etat 4
-        s4s = s(3);
-        h4s = XSteam('h_ps',p(4),s4s);
-        h(4) = h(3) - eta_SiT(1)*(h(3) - h4s);
-        t(4) = XSteam('T_ph',p(4),h(4));
-        s(4) = XSteam('s_ph',p(4),h(4));
-        x(4) = XSteam('x_ph',p(4),h(4));
-        e(4) = Exergie(h(4),s(4));
+% RESURCHAUFFE
+if reheat == 1
+    % Calcul Etat 4
+    s4s = s(3);
+    h4s = XSteam('h_ps',p(4),s4s);
+    h(4) = h(3) - eta_SiT(1)*(h(3) - h4s);
+    t(4) = XSteam('T_ph',p(4),h(4));
+    s(4) = XSteam('s_ph',p(4),h(4));
+    x(4) = XSteam('x_ph',p(4),h(4));
+    e(4) = Exergie(h(4),s(4),T_0);
 
-        % Calcul Etat 5 : t et p connus
-        h(5) = XSteam('h_pT',p(5),t(5));
-        s(5) = XSteam('s_ph',p(5),h(5));
-        x(5) = XSteam('x_ph',p(5),h(5));        
-        e(5) = Exergie(h(5),s(5));
+    % Calcul Etat 5 : t et p connus
+    h(5) = XSteam('h_pT',p(5),t(5));
+    s(5) = XSteam('s_ph',p(5),h(5));
+    x(5) = XSteam('x_ph',p(5),h(5));        
+    e(5) = Exergie(h(5),s(5),T_0);
 
-    elseif reheat == 0
-        % On zappe les etats 4 et 5
-        p([4 5]) = [NaN p(3)];
-        t([4 5]) = [NaN t(3)];
-        x([4 5]) = [NaN x(3)];
-        s([4 5]) = [NaN s(3)];
-        h([4 5]) = [NaN h(3)];
-        e([4 5]) = [NaN e(3)];
+elseif reheat == 0
+    % On zappe les etats 4 et 5
+    p([4 5]) = [NaN p(3)];
+    t([4 5]) = [NaN t(3)];
+    x([4 5]) = [NaN x(3)];
+    s([4 5]) = [NaN s(3)];
+    h([4 5]) = [NaN h(3)];
+    e([4 5]) = [NaN e(3)];
+end
+
+% SORTIE DE TURBINE BP
+% Calcul Etat 6
+s6s = s(5);
+x6s = XSteam('x_ps',p(6),s6s);
+h6s = XSteam('h_px',p(6),x6s);
+h(6) = h(5) - eta_SiT(2)*(h(5) - h6s);
+x(6) = XSteam('x_ph',p(6),h(6));
+t(6) = XSteam('T_ph',p(6),h(6));
+s(6) = XSteam('s_ph',p(6),h(6));
+e(6) = Exergie(h(6),s(6),T_0);
+% Verification du titre
+if ISNAN(x(6))
+    error('ERREUR : Le titre en sortie de turbine BP est > 1');
+end
+if x(6) < 0.88
+    error('ERREUR : Le titre en sortie de turbine BP est < 0.88');
+end
+
+% SORTIE DE CONDENSEUR
+% Calcul Etat 7 - p,t,x connus - etat liquide
+s(7) = XSteam('sL_T',t(7));
+h(7) = XSteam('hL_T',t(7));
+e(7) = Exergie(h(7),s(7),T_0);
+    
+%% Soutirages 
+% On considere quelques hypotheses :
+% 1) Il y a toujours un soutirage en sortie de HP (si nsout > 0).
+% 2) Pour les autres soutirages, ils sont repartis de manière
+% "equidistants" au niveau enthalpique.
+% 3) La détente dans les turbines est isentropique.
+% 4) on peut considerer que p_6is = p_6i en sortie des bleeders.
+% 5) a la sortie des éventuelles desurchauffes, etat de vapeur saturee.
+% 6) On met la bache de degazage lorsque le soutirage i a une température
+% superieure a 120°C a l'etat de liquide -> bache à l'indice i.
+% 7) le titre à l'entrée de chaque pompe est x = 0.
+% 8) La sortie d'un échangeur est à l'état de liquide saturé.
+    
+if nsout == 0 % Pas de soutirage - court-circuitage comme cycle Rankin-Hirn
+    p(1) = p(7);
+    t(1) = t(7);
+    x(1) = x(7);
+    s(1) = s(7);
+    h(1) = h(7);
+    e(1) = e(7);
+else
+
+    % Allocation et init. pour les differentes etapes des soutirages
+    % 4 etapes : extraction vap, vapeur sat., liquide sat., post detente vanne
+    % 5eme etape pour le subcooler uniquement
+    tbleed = zeros(5,nsout);
+    pbleed = zeros(5,nsout);
+    hbleed = zeros(5,nsout);
+    sbleed = zeros(5,nsout);
+    ebleed = zeros(5,nsout);
+    xbleed = zeros(5,nsout);
+
+    % Premier soutirage en sortie HP
+    tbleed(1,nsout) = t(3);
+    pbleed(1,nsout) = p(3);
+    hbleed(1,nsout) = h(3);
+    sbleed(1,nsout) = s(3);
+    ebleed(1,nsout) = e(3);
+    xbleed(1,nsout) = x(3);
+
+    % Autres soutirages
+    hdiv = (h(5) - h(6))/((nsout - 1) + 1); % "Pas" de difference d'enthalpie
+
+    for i=1:(nsout-1) % soutirage i=nsout est en sortie de HP
+        hbleed(1,i) = h(6) + hdiv*(i);
+        s_is = s(5);
+        h_is = (hbleed(1,i) - h(6))/eta_SiT + h(6);
+        p_is = XSteam('p_hs',h_is,s_is);
+        pbleed(1,i) = p_is; % p = p_is, voir hypotheses
+
+        % Reste des variables a l'etat 1
+        tbleed(1,i) = XSteam('T_ph',pbleed(1,i),hbleed(1,i));
+        sbleed(1,i) = XSteam('s_ph',pbleed(1,i),hbleed(1,i));
+        ebleed(1,i) = Exergie(hbleed(1,i),sbleed(1,i),T_0);
+        xbleed(1,i) = XSteam('x_ph',pbleed(1,i),hbleed(1,i));
     end
-
-    % SORTIE DE TURBINE BP
-    % Calcul Etat 6
-    s6s = s(5);
-    x6s = XSteam('x_ps',p(6),s6s);
-    h6s = XSteam('h_px',p(6),x6s);
-    h(6) = h(5) - eta_SiT(2)*(h(5) - h6s);
-    x(6) = XSteam('x_ph',p(6),h(6));
-    t(6) = XSteam('T_ph',p(6),h(6));
-    s(6) = XSteam('s_ph',p(6),h(6));
-    e(6) = Exergie(h(6),s(6));
-    % Verification du titre
-    if ISNAN(x(6))
-        error('ERREUR : Le titre en sortie de turbine BP est > 1');
+    % On definit la pression partout
+    pbleed([2 3],:) = ones(2,1)*pbleed(1,:); % isobare
+    for i=2:nsout
+        pbleed(4,i) = pbleed(3,i-1); % detente isenthalpique ds la vanne
     end
-    if x(6) < 0.88
-        error('ERREUR : Le titre en sortie de turbine BP est < 0.88');
-    end
+    pbleed(4,1) = p(7); % temporaire
+    
+    %On definit les autres etats
+    bache = 0;
+    for i=1:nsout
+        if hbleed(1,i) > XSteam('hV_p',pbleed(1,i))
+            hbleed(2,i) = XSteam('hV_p',pbleed(1,i));
+        else
+            hbleed(2,i) = hbleed(1,i); %soutirages non-surchauffes
+        end
+        hbleed(3,i) = XSteam('hL_p',pbleed(1,i));
+        hbleed(4,i) = hbleed(3,i); % detente isenthalpique
+        for j=2:4
+            tbleed(j,i) = XSteam('T_ph',pbleed(j,i),hbleed(j,i));
+            sbleed(j,i) = XSteam('s_ph',pbleed(j,i),hbleed(j,i));
+            ebleed(j,i) = Exergie(hbleed(j,i) , sbleed(j,i),T_0);
+            xbleed(j,i) = XSteam('x_ph',pbleed(j,i),hbleed(j,i));
+        end
 
-    % SORTIE DE CONDENSEUR
-    % Calcul Etat 7 - p,t,x connus - etat liquide
-    s(7) = XSteam('sL_T',t(7));
-    h(7) = XSteam('hL_T',t(7));
-
-%% Soutirages : Sortie de cond. -> Sortie de pompe alim.
-
-    switch nsout
-        case 0 % Pas de soutirage - court-circuitage comme cycle Rankin-Hirn
-        p(1) = p(7);
-        t(1) = t(7);
-        x(1) = x(7);
-        s(1) = s(7);
-        h(1) = h(7);
-        e(1) = e(7);
-        case 1 % Soutirage obligatoire en sortie de HP
-            % TO DO
-        case 2 % Soutirage en sortie de HP et MP ?? (reheat == 2)
-            % TO DO - sot sure !
-        otherwise
-            % TO DO
+        % Recherche de l'emplacement de la bache : le flot principal arrive
+        % un peu sous-refroidi p/ a la T de départ (130-150 degC, slide S6)
+        if (tbleed(3,i) > 120) && (bache == 0)
+            bache = i; % On garde l'indice en memoire.
+        elseif nsout == 1
+            bache = 1;
+        end
     end
     
-    % Pompe alimentaire
-    p(2) = p(3);
-    s2s = s(1);
-    h2s = XSteam('h_ps',p(2),s2s);
-    h(2) = h(1) + (h2s-h(1))/eta_SiC;
-    s(2) = XSteam('s_ph',p(2),h(2));
-    t(2) = t(1) + ((h(2)-h(1)) - (p(2)-p(1))*Give_muT(t(1))) / XSteam('Cp_ph',p(2),h(2));
-    x(2) = XSteam('x_ph',p(2),h(2));
-    e(2) = exergy(h(2),s(2));
+    %La bache n'a pas de vanne de detente
+    tbleed(4,bache) = tbleed(3,bache);
+    sbleed(4,bache) = sbleed(3,bache);
+    pbleed(4,bache) = pbleed(3,bache);
+    xbleed(4,bache) = xbleed(3,bache);
+    ebleed(4,bache) = ebleed(3,bache);
     
+    % On s'occupe du 1er soutirage, qui a le subcooler
+    tbleed(4,1) = t(7) + TPinchSub; % Livre p.69
+    pbleed(4,1) = pbleed(3,1);
+    hbleed(4,1) = XSteam('h_pT',pbleed(3,1),tbleed(3,1));
+    pbleed(5,1) = p(7);
+    tbleed(5,1) = t(7);
+    hbleed(5,1) = hbleed(4,1);
+    for j=4:5
+        sbleed(j,1) = XSteam('s_ph',pbleed(j,1),hbleed(j,1));
+        ebleed(j,1) = Exergie(hbleed(j,1) , sbleed(j,1),T_0);
+        xbleed(j,1) = XSteam('x_ph',pbleed(j,1),hbleed(j,1));
+    end    
+end
+
+%% De condenseur a pompe alimentaire
+% Point 8 : sortie de pompe Pe
+% vecteur 9 : de post-Pe a la bache
+% Point 10 : sortie de bache
+% Point 11 : post pompe Pb
+% Vecteur 12 : de post Pb a post-desurchauffeurs
+% Point 1 : devant Pa
+% Point 2 : apres Pa
+if nsout > 0
+    % 8 Pompe en sortie de condenseur
+    p(8) = pbleed(3,bache);
+    s8s = s(7);
+    h8s = XSteam('h_ps',p(8),s8s);
+    h(8) = h(7) + (h8s-h(7))/eta_SiC;
+    s(8) = XSteam('s_ph',p(8),h(8));
+    t(8) = XSteam('T_ph',p(8),h(8));
+    x(8) = XSteam('x_ph',p(8),h(8));
+    e(8) = Exergie(h(8),s(8),T_0);
+
+
+    % 10 : sortie de bache
+    t(10) = tbleed(3,bache);
+    p(10) = pbleed(3,bache);
+    x(10) = 0;
+    h(10) = XSteam('h_px',p(10),x(10));
+    s(10) = XSteam('s_ph',p(10),h(10));
+    e(10) = Exergie(h(10),s(10),T_0);
+
+    % 1 : devant Pa
+    tref = sort(tbleed(2,:),'descend');
+    t(1) = tref(1) + TpinchEx;
+    p(1) = XSteam('psat_T',t(1)); % On suppose liq. sature a l'entree
+    x(1) = 0;
+    h(1) = XSteam('h_pT',p(1),t(1));
+    s(1) = XSteam('s_pT',p(1),t(1));
+    e(1) = Exergie(h(1),s(1),T_0);
+end
+% 2 : Pompe alimentaire
+p(2) = p(3);
+s2s = s(1);
+h2s = XSteam('h_ps',p(2),s2s);
+h(2) = h(1) + (h2s-h(1))/eta_SiC;
+s(2) = XSteam('s_ph',p(2),h(2));
+t(2) = XSteam('T,ph',p(2),h(2));
+x(2) = XSteam('x,ph',p(2),h(2));
+e(2) = exergy(h(2),s(2));
+
+if nsout > 0
+    % 11 : Sortie Pb
+    p(11) = p(1);
+    s11s = s(10);
+    h11s = XSteam('h_ps',p(11),s11s);
+    h(11) = h(10) + (h11s-h(10))/eta_SiC;
+    s(11) = XSteam('s_ph',p(11),h(11));
+    t(11) = XSteam('T,ph',p(11),h(11));
+    x(11) = XSteam('x,ph',p(11),h(11));
+    e(11) = Exergie(h(11),s(11),T_0);
+end
+
+%% FLUX MASSIQUES
+%Calcul des Xflow
+if nsout > 1
+    DHliq = zeros(nsout,1); % Var. enthalpie du flux principal
+    DHbleed = zeros(nsout,1); % Var. enthalpie soutirages
+    DHres = zeros(nsout,1); % Residus d'enthalpie "post" soutirage
+    for i=1:nsout
+        DHbleed(i) = hbleed(1,i) - hbleed(3,i);
+        DHliq(i) = XSteam('h,pT',pbleed(1,i),tbleed(3,i)-TPinchEx) - XSteam('h_pT',tbleed(1,i)-TPinchEx);
+        if i == (bache-1) || i == nsout
+            DHres(i) = 0;
+        else
+            DHres(i) = hbleed(4,i-1) - hbleed(3,i);
+        end
+    end
+    %Creation de la matrice necessaire au systeme lineaire
+    DHRES = [DHres(1:nsout-bache)*ones(1,nsout-bache).*triu(nsout-bache,1) zeros(nsout-bache,bache) ; ...
+            zeros(bache,nsout-bache) DHres(bache:nsout)*ones(1,bache).*triu(bache,1)];
+    DHLIQ = [DHliq(1:nsout-bache)*ones(1,nsout-bache) zeros(nsout-bache,bache) ; DHliq(bache:nsout)*ones(1,nsout)];
+    A = diag(DHbleed) + DHRES - DHLIQ;
+    b = DHliq;
+    Xflow = A\b;
+elseif nsout ==1
+    Xflow = (h(2)-h(7))/(hbleed(1,nsout)-h(2));
+else 
+    %Rankin-Hirn
+    Xflow = 0;
+end
+
+%% Debit de l'installation
+% P_E = ((HP*flow + MP et BP * flow variables) - Pe*flow - Pa*flow -
+% Pb*flow)*eta_mec
+HP = (h(3)-h(4))*(1+sum(Xflow));
+eHP = (e(3)-e(4))*(1+sum(Xflow));
+MBP = hbleed(1,1) - h(7); % Dernier etape BP
+eMBP = ebleed(1,1)-e(7);
+MBP = MBP + h(5)-h(6); % Flux principl
+eMBP = eMBP + (e(5)-e(6));
+for i=2:nsout-1
+    MBP = MBP + (hbleed(i)-hbleed(i-1))*(sum(Xflow(1:i))); % Soutirages
+    eMBP = eMBP + (ebleed(i)-ebleed(i-1))*(sum(Xflow(1:i)));
+end
+P_Pa = (h(2)-h(1))*(1+sum(Xflow));
+P_Pe = (h(8)-h(7))*(1+sum(Xflow(1:bache-1)));
+P_Pb = (h(11)-h(10))*(1+sum(Xflow));
+e_Pa = (e(2)-e(1))*(1+sum(Xflow));
+e_Pe = (e(8)-e(7))*(1+sum(Xflow(1:bache-1)));
+e_Pb = (e(11)-e(10))*(1+sum(Xflow));
+
+
+Pm = HP+MBP-P_Pa-P_Pe-P_Pb; % Puissance motrice
+ePm = eHP+eMBP-e_Pa-e_Pe-e_Pb; % "Exergie motrice"
+MASSFLOW(2) = P_e/(Pm*eta_mec);
+m_tot = MASSFLOW(2);
+XMASSFLOW = MASSFLOW(2)*Xflow;
+
+
 %% CHAMBRE DE COMBUSTION
 
     % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
@@ -390,7 +597,7 @@ p(6) = p(7);
     p_exch = p(2);
     h_exch = [h(2), h_2prime, h_2secnd, h(3)];
     s_exch = [s(2), s_2prime, s_2secnd, s(3)];
-    e_exch = Exergie(h_exch,s_exch);
+    e_exch = Exergie(h_exch,s_exch,T_0);
     x_exch = [x(2), 0, 1, x(3)];
     
     %Calcul de l'échange de chaleur à l'échangeur (delta_h)
@@ -466,15 +673,59 @@ p(6) = p(7);
     fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques. 
     
     
+%% RENDEMENTS
+% Energetique
+eta_gen = m_tot*(h(3)-h(2))/(m_comb*PCI);
+eta_cyclen = (HP+MBP)/(MBP-(h(5)-h(6))-(h(3)-h(4)) + (h(3)-h(2)));
+eta_toten = eta_mec*eta_gen*eta_cyclen;
+
+% Exergetique
+eta_combex = ef*(lambda*ma1 + 1)/ec;
+eta_chemnex = (ef - ech)/(ef-er);
+eta_transex = m_tot*((e(3)-e(2))+(e(6)-e(5)))/(eta_combex*eta_chemnex*m_comb*ec);
+eta_gex = eta_transex*eta_chemnex*eta_combex;
+eta_rotex = Pm/ePm;
+eta_cyclex = eta_rotex*ePm/(m_tot*(e(3)-e(2)));
+
+eta_totex = eta_mec*eta_gex*eta_cyclex;
+
+%% Pertes
+Ltot = P_e/eta_totex;
+Lgen = (1-eta_gen)*Ltot;
+Lcyclen = (1-eta_cyclen)*Ltot;
+Lmec = (1-eta_mec)*Ltot;
+Ltotex = (1-eta_totex)*Ltot;
+Lrotex = (1-eta_rotex)*Ltot;
+Lcombex = (1-eta_combex)*Ltot;
+Lcyclex = (1-eta_cyclex)*Ltot;
+Lchemnex = (1-eta_chemnex)*Ltot;
+Ltransex = (1-eta_transex)*Ltot;
+
+%% OUTPUT
+ETA = [eta_cyclen eta_toten eta_cyclex eta_totex eta_gen eta_gex eta_combex eta_chemnex eta_transex];
+DATEN = [Lgen Lmec Lcyclen];
+DATEX = [Lmec Ltotex Lrotex Lcombex Lcyclex Lchemnex Ltransex];
+
+FIG(1) = figure;
+pie(eta_toten,eta_mec,eta_gen,eta_cyclen);
+legend('Puissance effective','Pertes mécaniques','Pertes à la cheminée','Pertes au condenseur');
+
+FIG(2) = figure;
+pie(eta_totex,eta_mec,eta_combex,eta_chemnex,eta_transex,eta_rotex,eta_cyclex);
+legend('Puissance effective','Pertes mécaniques','Pertes à la combustion', ...
+    'Pertes à la cheminée','Pertes au générateur de vapeur', ...
+    'Pertes à la turbine et aux pompes','Pertes au condenseur');
+
+
 end
 
-
 % Retourne l'exergie a un etat donne comme une difference avec 
-% INPUT = - etat : vecteur contenant les variables associees a cet etat
-% (p,t,x,s,h)
-% OUTPUT : - e : exergie de l'etat [kJ/kg], comparee a l'exergie à 15°C
-function e = Exergie(h , s)
-    h0= XSteam('hL_T',T_0);
-    s0= XSteam('sL_T',T_0);
-    e = (h-h0) - T_0*(s-s0); 
+% INPUT =  - h : enthalpie de l'etat [kJ/kg]
+%          - s : entropie de l'etat [kJ/kg]
+%          - T0 : temperature de reference 
+% OUTPUT = - e : exergie de l'etat [kJ/kg], comparee a l'exergie à T_0 °C
+function e = Exergie(h , s , T0)
+    h0= XSteam('hL_T',T0);
+    s0= XSteam('sL_T',T0);
+    e = (h-h0) - (273.15+T0)*(s-s0); 
 end
