@@ -567,8 +567,12 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     hLV_p2 = (h_2secnd - h_2prime);
     s_2prime = XSteam('sL_p',p(2));
     s_2scnd = XSteam('sV_p',p(2));
-    combustion.LHV = 50.15; % [MJ/kg] Pouvoir Calorifique Inférieur du Méthane
+    combustion.LHV = LHV(comb_y,comb_x); % [MJ/kg] Pouvoir Calorifique Inférieur du combustible
+    %comb_Tmax
+    %T_exhaust
+    %TDrum
     
+      
     
     % Masse Molaire des composants [kg/mol]
 
@@ -590,14 +594,14 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     %Combustible
     
     M_molComb = 0.012 + 0.001*comb_y + 0.016*comb_x;
-        % PCI = ?????????
+    PCI = LHV(x,y);
     
     %Vecteurs des états du flux principal
     t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
     p_exch = p(2);
     h_exch = [h(2), h_2prime, h_2secnd, h(3)];
     s_exch = [s(2), s_2prime, s_2secnd, s(3)];
-    e_exch = Exergie(h_exch,s_exch,T_0);
+    e_exch = Exergie(h_exch,s_exch);
     x_exch = [x(2), 0, 1, x(3)];
     
     %Calcul de l'échange de chaleur à l'échangeur (delta_h)
@@ -635,7 +639,8 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     
     c_moy_2 = (1/(t_exch(1)-t_exch(2)))*[sum(c_CO2f), sum(c_H2Of), sum(c_O2f), sum(c_N2f)];
 
-        %Estimation de l'enthalpie des fumées entre 2 et 2'
+    %Estimation de l'enthalpie des fumées
+    
     
         % CONTINUE HERE (ref = lignes 356+) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          
@@ -659,7 +664,13 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     
     %Enthalpie des gaz en [kg/mol]
     
-
+    hWat = sum(dh);¨%Total de l'enthalpie cedee a l'eau [kJ/kg
+    
+    %Recherche de T après l'echange de chaleur avec l'eau (
+    
+    hAir = ; %Enthalpie cedee a l'air alimentant la combustion
+    
+    
     
 
     %       -fum(1) = m_O2f  : massflow of O2 in exhaust gas [kg/s]
@@ -670,7 +681,7 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     
     %Evaluation du débit de combustible nécessaire à la combustion
     
-    fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques. 
+    fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques.  
     
     
 %% RENDEMENTS
@@ -718,6 +729,27 @@ legend('Puissance effective','Pertes mécaniques','Pertes à la combustion', ...
 
 
 end
+
+
+%Retourne le PCI d'un combustible du type CH_yO_x selon les données
+%disponibles dans des tables issues du cours LMECA2160 - Combustion and
+%fuels.
+% OUTPUT : - Lhv : PCI du carburant exprimé en [kJ/kmol]
+function Lhv = LHV(y,x)
+    if (y == 0 && x == 0) %Carbon Graphite
+        Lhv = 393400;
+    elseif (y == 4 && x == 0) % Methane
+        Lhv = 802400;
+    elseif (y == 8/3 && x == 0) % Propane
+        Lhv = 2044400;
+    elseif (y == 0 && x == 1) % Carbon monoxyde
+        Lhv = 282400;
+    elseif (y == 3 && x == 0.5) % Ethanol
+        Lhv = 26900 ;
+        
+    else
+            %FORMULE DE BOIL
+    end
 
 % Retourne l'exergie a un etat donne comme une difference avec 
 % INPUT =  - h : enthalpie de l'etat [kJ/kg]
