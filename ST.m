@@ -12,24 +12,24 @@ function [ETA, XMASSFLOW, DATEN, DATEX, DAT, MASSFLOW, COMBUSTION, FIG] = ST(P_e
 % OPTIONS is a structure containing :
 %   -options.nsout     [-] : Number of feed-heating 
 %   -options.reheat    [-] : Number of reheating
-%   -options.T_max     [∞C] : Maximum steam temperature
-%   -options.T_cond_out[∞C] : Condenseur cold outlet temperature
+%   -options.T_max     [¬∞C] : Maximum steam temperature
+%   -options.T_cond_out[¬∞C] : Condenseur cold outlet temperature
 %   -options.p3_hp     [bar] : Maximum pressure
 %   -options.drumFlag  [-] : if =1 then drum if =0 => no drum. 
 %   -options.eta_mec   [-] : mecanic efficiency of shafts bearings
 %   -options.comb is a structure containing combustion data : 
-%       -comb.Tmax     [∞C] : maximum combustion temperature
+%       -comb.Tmax     [¬∞C] : maximum combustion temperature
 %       -comb.lambda   [-] : air excess
 %       -comb.x        [-] : the ratio O_x/C. Example 0.05 in CH_1.2O_0.05
 %       -comb.y        [-] : the ratio H_y/C. Example 1.2 in CH_1.2O_0.05
-%   -options.T_exhaust [∞C] : Temperature of exhaust gas out of the chimney
+%   -options.T_exhaust [¬∞C] : Temperature of exhaust gas out of the chimney
 %   -options.p_3       [-] : High pressure after last reheating
 %   -options.x4        [-] : Vapor ratio [gaseous/liquid] (in french : titre)
-%   -options.T_0       [∞C] : Reference temperature
-%   -options.TpinchSub [∞C] : Temperature pinch at the subcooler
-%   -options.TpinchEx  [∞C] : Temperature pinch at a heat exchanger
-%   -options.TpinchCond[∞C] : Temperature pinch at condenser 
-%   -options.Tdrum     [∞C] : minimal drum temperature
+%   -options.T_0       [¬∞C] : Reference temperature
+%   -options.TpinchSub [¬∞C] : Temperature pinch at the subcooler
+%   -options.TpinchEx  [¬∞C] : Temperature pinch at a heat exchanger
+%   -options.TpinchCond[¬∞C] : Temperature pinch at condenser 
+%   -options.Tdrum     [¬∞C] : minimal drum temperature
 %   -option.eta_SiC    [-] : Isotrenpic efficiency for compression
 %   -option.eta_SiT    [-] : Isotrenpic efficiency for Turbine. It can be a vector of 2 values :
 %             	             eta_SiT(1)=eta_SiT_HP,eta_SiT(2)=eta_SiT_others
@@ -64,7 +64,7 @@ function [ETA, XMASSFLOW, DATEN, DATEX, DAT, MASSFLOW, COMBUSTION, FIG] = ST(P_e
 %   -datex(6) : perte_chemex [kW]
 %   -datex(7) : perte_transex[kW]
 % DAT is a matrix containing :
-% dat = {T_1       , T_2       , ...       , T_6_I,     T_6_II, ... ;  [∞C]
+% dat = {T_1       , T_2       , ...       , T_6_I,     T_6_II, ... ;  [¬∞C]
 %        p_1       , p_2       , ...       , p_6_I,     p_6_II, ... ;  [bar]
 %        h_1       , h_2       , ...       , h_6_I,     h_6_II, ... ;  [kJ/kg]
 %        s_1       , s_2       , ...       , s_6_I,     s_6_II, ... ;  [kJ/kg/K]
@@ -256,7 +256,7 @@ end
 % L9 : de post-Pe a la bache
 % L10 : sortie de bache
 % L11 : post pompe Pb
-% L12 : de post Pb a entrÈe Pa
+% L12 : de post Pb a entr√©e Pa
 p = zeros(1,11); % [p,t,x,s,h,e]
 t = zeros(1,11);
 x = zeros(1,11); % x = NaN si vapeur surchauffe ou liquide sous-refroidi 
@@ -339,15 +339,15 @@ e(7) = Exergie(h(7),s(7));
 %% Soutirages 
 % On considere quelques hypotheses :
 % 1) Il y a toujours un soutirage en sortie de HP (si nsout > 0).
-% 2) Pour les autres soutirages, ils sont repartis de maniËre
+% 2) Pour les autres soutirages, ils sont repartis de mani√®re
 % "equidistants" au niveau enthalpique.
-% 3) La dÈtente dans les turbines est isentropique.
+% 3) La d√©tente dans les turbines est isentropique.
 % 4) on peut considerer que p_6is = p_6i en sortie des bleeders.
-% 5) a la sortie des Èventuelles desurchauffes, etat de vapeur saturee.
-% 6) On met la bache de degazage lorsque le soutirage i a une tempÈrature
-% superieure a 120∞C a l'etat de liquide -> bache ‡ l'indice i.
-% 7) le titre ‡ l'entrÈe de chaque pompe est x = 0.
-% 8) La sortie d'un Èchangeur est ‡ l'Ètat de liquide saturÈ.
+% 5) a la sortie des √©ventuelles desurchauffes, etat de vapeur saturee.
+% 6) On met la bache de degazage lorsque le soutirage i a une temp√©rature
+% superieure a 120¬∞C a l'etat de liquide -> bache √† l'indice i.
+% 7) le titre √† l'entr√©e de chaque pompe est x = 0.
+% 8) La sortie d'un √©changeur est √† l'√©tat de liquide satur√©.
     
 if nsout == 0 % Pas de soutirage - court-circuitage comme cycle Rankin-Hirn
     p(1) = p(7);
@@ -417,7 +417,7 @@ else
         end
 
         % Recherche de l'emplacement de la bache : le flot principal arrive
-        % un peu sous-refroidi p/ a la T de dÈpart (130-150 degC, slide S6)
+        % un peu sous-refroidi p/ a la T de d√©part (130-150 degC, slide S6)
         if (tbleed(3,i) > 120) && (bache == 0)
             bache = i; % On garde l'indice en memoire.
         elseif nsout == 1
@@ -568,14 +568,14 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
     % chaleur entre le combustible (CH4) et l'eau du circuit.
     
-    %DonnÈes utiles
+    %Donn√©es utiles
     Tsat_p2 = XSteam('Tsat_p',p(2));
     h_2prime = XSteam('hL_p',p(2));
     h_2secnd = XSteam('hV_p',p(2));
     hLV_p2 = (h_2secnd - h_2prime);
     s_2prime = XSteam('sL_p',p(2));
     s_2scnd = XSteam('sV_p',p(2));
-    combustion.LHV = LHV(comb_y,comb_x); % [MJ/kg] Pouvoir Calorifique InfÈrieur du combustible
+    combustion.LHV = LHV(comb_y,comb_x); % [MJ/kg] Pouvoir Calorifique Inf√©rieur du combustible
     %comb_Tmax
     %T_exhaust
     %TDrum
@@ -591,7 +591,7 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     M_molComb = 0.012 + 0.001*comb_y + 0.016*comb_x;
     PCI = LHV(comb_x,comb_y);
     
-    %Vecteurs des Ètats du flux principal
+    %Vecteurs des √©tats du flux principal
     t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
     p_exch = p(2);
     h_exch = [h(2), h_2prime, h_2secnd, h(3)];
@@ -599,10 +599,10 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     e_exch = Exergie(h_exch,s_exch);
     x_exch = [x(2), 0, 1, x(3)];
     
-    %Calcul de l'Èchange de chaleur ‡ l'Èchangeur (delta_h)
+    %Calcul de l'√©change de chaleur √† l'√©changeur (delta_h)
     dh_exch = [h_exch(2)-h_exch(1), hLV_p2, h_exch(3)-h_exch(4)];
     
-    %Evaluation de la composition des fumÈes
+    %Evaluation de la composition des fum√©es
     %comb_y , comb_x, comb_lambda, comb_Tmax
     [mass_O2f, mass_CO2f, mass_N2f, mass_H2Of, R_fum] = ComputeMassFraction(lambda,comb_x,comb_y);
     MassFr = [mass_O2f mass_CO2f mass_N2f mass_H2Of];
@@ -616,12 +616,12 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     
     hWat = sum(dh);%Total de l'enthalpie cedee a l'eau [kJ/kg
     
-    %Recherche de T aprËs l'echange de chaleur avec l'eau (
+    h1g = cpg(MassFr,0,comb_Tmax)*comb_Tmax; % Enthalpie des fum√©es a la temperature max de combustion
+    hOutg = cpg(MassFr,0,T_exhaust)*T_exhaust; % Enthalpie des fum√©es a la sortie de la chemin√©e
+    h1a = cpa(0,T_0)*T_0; %Enthalpie de l'air a l'aspiration vers la Ch de Combustion
     
-    %hAir = ; %Enthalpie cedee a l'air alimentant la combustion
-    
-    
-    
+    %Calcul du d√©bit de carburant n√©cessaire     
+    mdotCarb = m_tot *((dh_exch)/((1+comb_lambda*m_a1)*(h1g-hOutg)-PCI-h1g+(comb_lambda*m_a1*h1a)));
 
     %       -fum(1) = m_O2f  : massflow of O2 in exhaust gas [kg/s]
 %       -fum(2) = m_N2f  : massflow of N2 in exhaust gas [kg/s]
@@ -629,9 +629,9 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
 %       -fum(4) = m_H2Of : massflow of H2O in exhaust gas [kg/s] 
     
     
-    %Evaluation du dÈbit de combustible nÈcessaire ‡ la combustion
+    %Evaluation du d√©bit de combustible n√©cessaire √† la combustion
     
-    fracMol_CHyOx = fracMol_CO2f; %StoechiomÈtriquement identiques.  
+    %fracMol_CHyOx = fracMol_CO2f; %Stoechiom√©triquement identiques.  
     
     
 %% RENDEMENTS
@@ -670,21 +670,21 @@ DATEX = [Lmec Ltotex Lrotex Lcombex Lcyclex Lchemnex Ltransex];
 if display ==1
     FIG(1) = figure;
     pie(eta_toten,eta_mec,eta_gen,eta_cyclen);
-    legend('Puissance effective','Pertes mÈcaniques','Pertes ‡ la cheminÈe','Pertes au condenseur');
+    legend('Puissance effective','Pertes m√©caniques','Pertes √† la chemin√©e','Pertes au condenseur');
 
     FIG(2) = figure;
     pie(eta_totex,eta_mec,eta_combex,eta_chemnex,eta_transex,eta_rotex,eta_cyclex);
-    legend('Puissance effective','Pertes mÈcaniques','Pertes ‡ la combustion', ...
-        'Pertes ‡ la cheminÈe','Pertes au gÈnÈrateur de vapeur', ...
-        'Pertes ‡ la turbine et aux pompes','Pertes au condenseur');
+    legend('Puissance effective','Pertes m√©caniques','Pertes √† la combustion', ...
+        'Pertes √† la chemin√©e','Pertes au g√©n√©rateur de vapeur', ...
+        'Pertes √† la turbine et aux pompes','Pertes au condenseur');
 end
 
 
 
-%Retourne le PCI d'un combustible du type CH_yO_x selon les donnÈes
+%Retourne le PCI d'un combustible du type CH_yO_x selon les donn√©es
 %disponibles dans des tables issues du cours LMECA2160 - Combustion and
 %fuels.
-% OUTPUT : - Lhv : PCI du carburant exprimÈ en [kJ/kmol]
+% OUTPUT : - Lhv : PCI du carburant exprim√© en [kJ/kmol]
 function Lhv = LHV(y,x)
     if (y == 0 && x == 0) %Carbon Graphite
         Lhv = 393400;
@@ -706,7 +706,7 @@ end
 % INPUT =  - h : enthalpie de l'etat [kJ/kg]
 %          - s : entropie de l'etat [kJ/kg]
 %          - T0 : temperature de reference 
-% OUTPUT = - e : exergie de l'etat [kJ/kg], comparee a l'exergie ‡ T_0 ∞C
+% OUTPUT = - e : exergie de l'etat [kJ/kg], comparee a l'exergie √† T_0 ¬∞C
 function e = Exergie(h , s)
     h0= XSteam('hL_T',T_0);
     s0= XSteam('sL_T',T_0);
