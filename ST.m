@@ -369,12 +369,12 @@ else
     xbleed = zeros(5,nsout);
 
     % Premier soutirage en sortie HP
-    tbleed(1,nsout) = t(3);
-    pbleed(1,nsout) = p(3);
-    hbleed(1,nsout) = h(3);
-    sbleed(1,nsout) = s(3);
-    ebleed(1,nsout) = e(3);
-    xbleed(1,nsout) = x(3);
+    tbleed(1,nsout) = t(4);
+    pbleed(1,nsout) = p(4);
+    hbleed(1,nsout) = h(4);
+    sbleed(1,nsout) = s(4);
+    ebleed(1,nsout) = e(4);
+    xbleed(1,nsout) = x(4);
 
     % Autres soutirages
     hdiv = (h(5) - h(6))/((nsout - 1) + 1); % "Pas" de difference d'enthalpie
@@ -407,6 +407,7 @@ else
         else
             hbleed(2,i) = hbleed(1,i); %soutirages non-surchauffes
         end
+        hbleed(2,i) = XSteam('hV_p',pbleed(1,i));
         hbleed(3,i) = XSteam('hL_p',pbleed(1,i));
         hbleed(4,i) = hbleed(3,i); % detente isenthalpique
         for j=2:4
@@ -415,7 +416,6 @@ else
             ebleed(j,i) = Exergie(hbleed(j,i) , sbleed(j,i));
             xbleed(j,i) = XSteam('x_ph',pbleed(j,i),hbleed(j,i));
         end
-
         % Recherche de l'emplacement de la bache : le flot principal arrive
         % un peu sous-refroidi p/ a la T de départ (130-150 degC, slide S6)
         if (tbleed(3,i) > 120) && (bache == 0)
@@ -424,7 +424,6 @@ else
             bache = 1;
         end
     end
-    
     %La bache n'a pas de vanne de detente
     tbleed(4,bache) = tbleed(3,bache);
     sbleed(4,bache) = sbleed(3,bache);
@@ -479,8 +478,8 @@ if nsout > 0
     t(1) = tref(1) + TpinchEx;
     p(1) = XSteam('psat_T',t(1)); % On suppose liq. sature a l'entree
     x(1) = 0;
-    h(1) = XSteam('h_pT',p(1),t(1));
-    s(1) = XSteam('s_pT',p(1),t(1));
+    h(1) = XSteam('hL_T',t(1));
+    s(1) = XSteam('sL_T',t(1));
     e(1) = Exergie(h(1),s(1));
 end
 % 2 : Pompe alimentaire
@@ -505,29 +504,71 @@ if nsout > 0
     e(11) = Exergie(h(11),s(11));
 end
 
+% t
+% p
+% h
 %% FLUX MASSIQUES
 %Calcul des Xflow
 if nsout > 1
-    DHliq = zeros(nsout,1); % Var. enthalpie du flux principal
-    DHbleed = zeros(nsout,1); % Var. enthalpie soutirages
-    DHres = zeros(nsout,1); % Residus d'enthalpie "post" soutirage
-    for i=1:nsout
-        DHbleed(i) = hbleed(1,i) - hbleed(3,i);
-        DHliq(i) = XSteam('h_pT',pbleed(1,i),tbleed(3,i)-TpinchEx) - XSteam('h_pT',pbleed(1,i),tbleed(1,i)-TpinchEx);
-        if i == (bache-1) || i == nsout || i == 1
-            DHres(i) = 0;
+    n = nsout+1;
+    b = bache;
+    DHliq = zeros(n,1); % Var. enthalpie du flux principal
+    Hliq = zeros(n,1);
+    DHbleed = zeros(n,1); % Var. enthalpie soutirages
+    DHres = zeros(n,1); % Residus d'enthalpie "post" soutirage
+    for i=1:n
+        if i == 1 %Subcooler
+            DHbleed(1) = 0;
+            %DHres(1) = hbleed(3,1) - hbleed(4,1);
+            DHres(1) = 0;
+            Hliq(1) = h(8);
+            DHliq(1) = XSteam('h_pT',p(8),tbleed(4,1) - TpinchSub) - h(8);
+            Hliq(2) = Hliq(1) + DHliq(1);
+            DHliq(1) = 0;
         else
-            DHres(i) = hbleed(4,i-1) - hbleed(3,i);
+            % Pour DHres
+            if i == b || i == n
+                DHres(i) = 0;
+            else
+                DHres(i) = hbleed(3,i)-hbleed(3,i-1);
+            end
+            
+            % Pour DHbleed
+            DHbleed(i) = hbleed(1,i-1) - hbleed(3,i-1);
+            
+            % Pour DHliq
+            if i == b+1 % bache
+                DHliq(i) = h(10) - Hliq(i);
+            elseif i == b+2 % Echangeur apres pompe Pb
+                Hliq(i) = h(11);
+                DHliq(i) = XSteam('h_pT',p(11),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+                Hliq(i+1) = Hliq(i) + DHliq(i);
+            elseif i > b+2 % apres bache
+                DHliq(i) = XSteam('h_pT',p(11),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+                Hliq(i+1) = Hliq(i) + DHliq(i);
+            else % avant bache
+                DHliq(i) = XSteam('h_pT',p(8),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+                Hliq(i+1) = Hliq(i) + DHliq(i);
+            end
         end
     end
     %Creation de la matrice necessaire au systeme lineaire
-    % A REFAIRE
-    DHRES = [DHres(1:nsout-bache)*ones(1,nsout-bache).*triu(ones(nsout-bache),1) zeros(nsout-bache,bache) ; ...
-            zeros(bache,nsout-bache) DHres(nsout-bache+1:nsout)*ones(1,bache).*triu(bache,1)];
-    DHLIQ = [DHliq(1:nsout-bache)*ones(1,nsout-bache) zeros(nsout-bache,bache) ; DHliq(nsout-bache+1:nsout)*ones(1,nsout)];    
-    A = diag(DHbleed) + DHRES - DHLIQ;
+    DHRES = DHres*ones(1,n);
+    DHRES = triu(DHRES,1);
+    DHRES(1:b,b+1:n) = 0;
+    DHLIQ = DHliq*ones(1,n);
+    DHLIQ(1:b,b+1:n) = 0;
+    DHBLEED = diag(DHbleed); 
+    DHLIQ(1,:) = [];
+    DHLIQ(:,1) = [];
+    DHRES(1,:) = [];
+    DHRES(:,1) = [];
+    DHBLEED(1,:) = [];
+    DHBLEED(:,1) = [];
+    DHliq(1) = [];
+    A = DHBLEED + DHRES - DHLIQ;
     b = DHliq;
-    Xflow = A\b;
+    Xflow = A\b
 elseif nsout ==1
     Xflow = (h(2)-h(7))/(hbleed(1,nsout)-h(2));
 else 
@@ -568,20 +609,22 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
     % chaleur entre le combustible (CH4) et l'eau du circuit.
     
+    
     %Données utiles
+    lambda = comb.lambda;
     Tsat_p2 = XSteam('Tsat_p',p(2));
     h_2prime = XSteam('hL_p',p(2));
     h_2secnd = XSteam('hV_p',p(2));
     hLV_p2 = (h_2secnd - h_2prime);
     s_2prime = XSteam('sL_p',p(2));
-    s_2scnd = XSteam('sV_p',p(2));
+    s_2secnd = XSteam('sV_p',p(2));
     combustion.LHV = LHV(comb_y,comb_x); % [MJ/kg] Pouvoir Calorifique Inférieur du combustible
     %comb_Tmax
     %T_exhaust
     %TDrum
     
     % Constante des gazs de l'air
-    [~, R_air] = Cpa(T0);
+    [~, R_air] = Cpa(T_0);
     
     % Pouvoir Comburivore
     m_a1 = ((32 + 3.76*28)*(1+((comb_y-2*comb_x)/4)))/(12+comb_y+comb_x*16);
@@ -589,7 +632,7 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     %Combustible
     
     M_molComb = 0.012 + 0.001*comb_y + 0.016*comb_x;
-    PCI = LHV(comb_x,comb_y);
+    %PCI = LHV(comb_x,comb_y);
     
     %Vecteurs des états du flux principal
     t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
@@ -607,6 +650,11 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     [mass_O2f, mass_CO2f, mass_N2f, mass_H2Of, R_fum] = ComputeMassFraction(lambda,comb_x,comb_y);
     MassFr = [mass_O2f mass_CO2f mass_N2f mass_H2Of];
     
+%     %ON MATTE L'EVOLUTION DE Cpa ET Cpg
+%     X = linspace(273.15,2000,10000);
+%     Y = Cpg(MassFr,X);
+%     Y2 = Cpa(X);
+%     plot(X,Y,X,Y2)
     % Calcul des Cp moyen des fumees 
     c_moy_22p = Cpg(MassFr,t_exch(1),t_exch(2)); % Entre 2 et 2'
     c_moy_2p2pp = Cpg(MassFr,t_exch(2),t_exch(3)); % Entre 2' et 2''
@@ -616,12 +664,12 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     
     hWat = sum(dh);%Total de l'enthalpie cedee a l'eau [kJ/kg
     
-    h1g = cpg(MassFr,0,comb_Tmax)*comb_Tmax; % Enthalpie des fumées a la temperature max de combustion
-    hOutg = cpg(MassFr,0,T_exhaust)*T_exhaust; % Enthalpie des fumées a la sortie de la cheminée
-    h1a = cpa(0,T_0)*T_0; %Enthalpie de l'air a l'aspiration vers la Ch de Combustion
+    %Recherche de T après l'echange de chaleur avec l'eau (
     
-    %Calcul du débit de carburant nécessaire     
-    mdotCarb = m_tot *((dh_exch)/((1+comb_lambda*m_a1)*(h1g-hOutg)-PCI-h1g+(comb_lambda*m_a1*h1a)));
+    %hAir = ; %Enthalpie cedee a l'air alimentant la combustion
+    
+    
+    
 
     %       -fum(1) = m_O2f  : massflow of O2 in exhaust gas [kg/s]
 %       -fum(2) = m_N2f  : massflow of N2 in exhaust gas [kg/s]
@@ -631,7 +679,7 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     
     %Evaluation du débit de combustible nécessaire à la combustion
     
-    %fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques.  
+    fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques.  
     
     
 %% RENDEMENTS
