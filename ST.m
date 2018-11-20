@@ -105,7 +105,7 @@ if nargin<3
     display = 1;
     if nargin<2
         comb = struct('Tmax',1400,'lambda',1.2,'x',0,'y',4);
-        options = struct('nsout',8,'reheat',1,'T_max',525,'T_cond_out',30,'p3_hp',200, ...
+        options = struct('nsout',30,'reheat',1,'T_max',525,'T_cond_out',30,'p3_hp',200, ...
             'DrumFlag',0,'eta_mec',0.98,'comb',comb,'T_exhaust',500, ...
             'p_3',28,'x4',0.89,'T_0',15,'TpinchSub',4,'TpinchEx',10, ...
             'TpinchCond',15,'Tdrum',250,'eta_SiC',0.9,'eta_SiT',[0.9 0.9]);
@@ -321,7 +321,7 @@ t(6) = XSteam('T_ph',p(6),h(6));
 s(6) = XSteam('s_ph',p(6),h(6));
 e(6) = Exergie(h(6),s(6));
 % Verification du titre
-if ~isfinite(x(6))
+if abs(x(6) - 1) <= 1e-4 
     x(6)
     error('ERREUR : Le titre en sortie de turbine BP est > 1');
 end
@@ -369,35 +369,36 @@ else
     xbleed = zeros(5,nsout);
 
     % Premier soutirage en sortie HP
-    tbleed(1,nsout) = t(4);
-    pbleed(1,nsout) = p(4);
-    hbleed(1,nsout) = h(4);
-    sbleed(1,nsout) = s(4);
-    ebleed(1,nsout) = e(4);
-    xbleed(1,nsout) = x(4);
+    tbleed(1,1) = t(4);
+    pbleed(1,1) = p(4);
+    hbleed(1,1) = h(4);
+    sbleed(1,1) = s(4);
+    ebleed(1,1) = e(4);
+    xbleed(1,1) = x(4);
 
     % Autres soutirages
     hdiv = (h(5) - h(6))/((nsout - 1) + 1); % "Pas" de difference d'enthalpie
 
-    for i=1:(nsout-1) % soutirage i=nsout est en sortie de HP
-        hbleed(1,i) = h(6) + hdiv*(i);
+    for i=2:nsout % soutirage i=nsout est en sortie de HP
+        hbleed(1,i) = h(5)-(i-1)*hdiv;
         s_is = s(5);
-        h_is = (hbleed(1,i) - h(6))/eta_SiT(2) + h(6);
+        h_is = h(5)-(h(5)-hbleed(1,i))/eta_SiT(2);
         p_is = XSteam('p_hs',h_is,s_is);
         pbleed(1,i) = p_is; % p = p_is, voir hypotheses
-
+        
         % Reste des variables a l'etat 1
         tbleed(1,i) = XSteam('T_ph',pbleed(1,i),hbleed(1,i));
         sbleed(1,i) = XSteam('s_ph',pbleed(1,i),hbleed(1,i));
         ebleed(1,i) = Exergie(hbleed(1,i),sbleed(1,i));
         xbleed(1,i) = XSteam('x_ph',pbleed(1,i),hbleed(1,i));
     end
+
     % On definit la pression partout
     pbleed([2 3],:) = ones(2,1)*pbleed(1,:); % isobare
-    for i=2:nsout
-        pbleed(4,i) = pbleed(3,i-1); % detente isenthalpique ds la vanne
+    for i=1:nsout-1
+        pbleed(4,i) = pbleed(3,i+1); % detente isenthalpique ds la vanne
     end
-    pbleed(4,1) = p(7); % temporaire
+    pbleed(4,nsout) = pbleed(3,nsout);
     
     %On definit les autres etats
     bache = 0;
@@ -407,7 +408,6 @@ else
         else
             hbleed(2,i) = hbleed(1,i); %soutirages non-surchauffes
         end
-        hbleed(2,i) = XSteam('hV_p',pbleed(1,i));
         hbleed(3,i) = XSteam('hL_p',pbleed(1,i));
         hbleed(4,i) = hbleed(3,i); % detente isenthalpique
         for j=2:4
@@ -418,7 +418,7 @@ else
         end
         % Recherche de l'emplacement de la bache : le flot principal arrive
         % un peu sous-refroidi p/ a la T de départ (130-150 degC, slide S6)
-        if (tbleed(3,i) > 120) && (bache == 0)
+        if (tbleed(3,i) > 120)
             bache = i; % On garde l'indice en memoire.
         elseif nsout == 1
             bache = 1;
@@ -432,19 +432,30 @@ else
     ebleed(4,bache) = ebleed(3,bache);
     
     % On s'occupe du 1er soutirage, qui a le subcooler
-    tbleed(4,1) = t(7) + TpinchSub; % Livre p.69
-    pbleed(4,1) = pbleed(3,1);
-    hbleed(4,1) = XSteam('h_pT',pbleed(3,1),tbleed(3,1));
-    pbleed(5,1) = p(7);
-    tbleed(5,1) = t(7);
-    hbleed(5,1) = hbleed(4,1);
+    tbleed(4,nsout) = t(7) + TpinchSub; % Livre p.69
+    pbleed(4,nsout) = pbleed(3,nsout);
+    hbleed(4,nsout) = XSteam('h_pT',pbleed(3,nsout),tbleed(4,nsout));
+    pbleed(5,nsout) = p(7);
+    tbleed(5,nsout) = t(7);
+    hbleed(5,nsout) = hbleed(4,nsout);
     for j=4:5
-        sbleed(j,1) = XSteam('s_ph',pbleed(j,1),hbleed(j,1));
-        ebleed(j,1) = Exergie(hbleed(j,1) , sbleed(j,1));
-        xbleed(j,1) = XSteam('x_ph',pbleed(j,1),hbleed(j,1));
+        sbleed(j,nsout) = XSteam('s_ph',pbleed(j,nsout),hbleed(j,nsout));
+        ebleed(j,nsout) = Exergie(hbleed(j,nsout) , sbleed(j,nsout));
+        xbleed(j,nsout) = XSteam('x_ph',pbleed(j,nsout),hbleed(j,nsout));
     end    
 end
-
+for i=1:nsout
+    if i == 1
+        DHres(i) = 0;
+    else
+        DHres(i) = xbleed(4,i-1)*(XSteam('hV_p',pbleed(4,i-1))-XSteam('hL_p',pbleed(4,i-1)));
+    end
+end
+% tbleed
+% pbleed
+% xbleed
+% hbleed
+% sbleed
 %% De condenseur a pompe alimentaire
 % Point 8 : sortie de pompe Pe
 % vecteur 9 : de post-Pe a la bache
@@ -504,68 +515,57 @@ if nsout > 0
     e(11) = Exergie(h(11),s(11));
 end
 
-% t
-% p
-% h
+tbleed
+pbleed
+xbleed
+hbleed
+sbleed
 %% FLUX MASSIQUES
 %Calcul des Xflow
 if nsout > 1
-    n = nsout+1;
+    n = nsout;
     b = bache;
     DHliq = zeros(n,1); % Var. enthalpie du flux principal
     Hliq = zeros(n,1);
     DHbleed = zeros(n,1); % Var. enthalpie soutirages
-    DHres = zeros(n,1); % Residus d'enthalpie "post" soutirage
-    for i=1:n
-        if i == 1 %Subcooler
-            DHbleed(1) = 0;
-            %DHres(1) = hbleed(3,1) - hbleed(4,1);
-            DHres(1) = 0;
-            Hliq(1) = h(8);
-            DHliq(1) = XSteam('h_pT',p(8),tbleed(4,1) - TpinchSub) - h(8);
-            Hliq(2) = Hliq(1) + DHliq(1);
-            DHliq(1) = 0;
-        else
-            % Pour DHres
-            if i == b || i == n
-                DHres(i) = 0;
-            else
-                DHres(i) = hbleed(3,i)-hbleed(3,i-1);
-            end
-            
-            % Pour DHbleed
-            DHbleed(i) = hbleed(1,i-1) - hbleed(3,i-1);
-            
-            % Pour DHliq
-            if i == b+1 % bache
-                DHliq(i) = h(10) - Hliq(i);
-            elseif i == b+2 % Echangeur apres pompe Pb
-                Hliq(i) = h(11);
-                DHliq(i) = XSteam('h_pT',p(11),tbleed(3,i-1) - TpinchEx) - Hliq(i);
-                Hliq(i+1) = Hliq(i) + DHliq(i);
-            elseif i > b+2 % apres bache
-                DHliq(i) = XSteam('h_pT',p(11),tbleed(3,i-1) - TpinchEx) - Hliq(i);
-                Hliq(i+1) = Hliq(i) + DHliq(i);
-            else % avant bache
-                DHliq(i) = XSteam('h_pT',p(8),tbleed(3,i-1) - TpinchEx) - Hliq(i);
-                Hliq(i+1) = Hliq(i) + DHliq(i);
-            end
+    DHres = DHres'; % Residus d'enthalpie "post" soutirage
+    for i=n:-1:1
+        % Pour DHbleed
+        DHbleed(i) = hbleed(1,i) - hbleed(3,i);
+        if i == n %Subcooler
+            Hliq(n) = h(8);
+            DHliq(n) = XSteam('h_pT',p(8),tbleed(4,n) - TpinchSub) - h(8);
+            Hliq(n) = Hliq(n) + DHliq(n);
+            DHliq(n) = DHliq(n) + XSteam('h_pT',p(8),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+            Hliq(n-1) = Hliq(n) + DHliq(n);
+        % Pour DHliq
+        elseif i == b % bache
+            DHliq(i) = h(10) - Hliq(i);
+        elseif i == b-1 % Echangeur apres pompe Pb
+            Hliq(i) = h(11);
+            DHliq(i) = XSteam('h_pT',p(11),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+            Hliq(i-1) = Hliq(i) + DHliq(i);
+         elseif i == 1 % dernier soutirage
+            DHliq(i) = h(1) - Hliq(i);
+        elseif i < b-1 % apres bache
+            DHliq(i) = XSteam('h_pT',p(11),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+            Hliq(i-1) = Hliq(i) + DHliq(i);
+        else % avant bache
+            DHliq(i) = XSteam('h_pT',p(8),tbleed(3,i-1) - TpinchEx) - Hliq(i);
+            Hliq(i-1) = Hliq(i) + DHliq(i);
         end
+
     end
+
     %Creation de la matrice necessaire au systeme lineaire
     DHRES = DHres*ones(1,n);
-    DHRES = triu(DHRES,1);
-    DHRES(1:b,b+1:n) = 0;
+    DHRES = tril(DHRES,-1);
+    DHRES(b+1:n,1:b) = 0;
+    DHRES(:,b) = 0;
     DHLIQ = DHliq*ones(1,n);
-    DHLIQ(1:b,b+1:n) = 0;
+    DHLIQ(b+1:n,1:b) = 0;
+    DHLIQ(b+1:n,b) = 0
     DHBLEED = diag(DHbleed); 
-    DHLIQ(1,:) = [];
-    DHLIQ(:,1) = [];
-    DHRES(1,:) = [];
-    DHRES(:,1) = [];
-    DHBLEED(1,:) = [];
-    DHBLEED(:,1) = [];
-    DHliq(1) = [];
     A = DHBLEED + DHRES - DHLIQ;
     b = DHliq;
     Xflow = A\b
@@ -575,7 +575,7 @@ else
     %Rankin-Hirn
     Xflow = 0;
 end
-
+    1+sum(Xflow)
 %% Debit de l'installation
 % P_E = ((HP*flow + MP et BP * flow variables) - Pe*flow - Pa*flow -
 % Pb*flow)*eta_mec
@@ -632,7 +632,7 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     %Combustible
     
     M_molComb = 0.012 + 0.001*comb_y + 0.016*comb_x;
-    %PCI = LHV(comb_x,comb_y);
+    PCI = LHV(comb_y,comb_x);
     
     %Vecteurs des états du flux principal
     t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
@@ -650,15 +650,15 @@ XMASSFLOW = MASSFLOW(2)*Xflow;
     [mass_O2f, mass_CO2f, mass_N2f, mass_H2Of, R_fum] = ComputeMassFraction(lambda,comb_x,comb_y);
     MassFr = [mass_O2f mass_CO2f mass_N2f mass_H2Of];
     
-%     %ON MATTE L'EVOLUTION DE Cpa ET Cpg
-%     X = linspace(273.15,2000,10000);
-%     Y = Cpg(MassFr,X);
-%     Y2 = Cpa(X);
-%     plot(X,Y,X,Y2)
+    %ON MATTE L'EVOLUTION DE Cpa ET Cpg
+    X = linspace(273.15,2000,10000);
+    Y = Cpg(MassFr,X);
+    Y2 = Cpa(X);
+    plot(X,Y,X,Y2)
     % Calcul des Cp moyen des fumees 
-    c_moy_22p = Cpg(MassFr,t_exch(1),t_exch(2)); % Entre 2 et 2'
-    c_moy_2p2pp = Cpg(MassFr,t_exch(2),t_exch(3)); % Entre 2' et 2''
-    c_moy_2pp3 = Cpg(MassFr,t_exch(3),t_exch(4)); % Entre 2'' et 3
+    c_moy_22p = Cpg(MassFr,t_exch(1)+273.15,t_exch(2)+273.15); % Entre 2 et 2'
+    c_moy_2p2pp = Cpg(MassFr,t_exch(2)+273.15,t_exch(3)+273.15); % Entre 2' et 2''
+    c_moy_2pp3 = Cpg(MassFr,t_exch(3)+273.15,t_exch(4)+273.15); % Entre 2'' et 3
     
     %Enthalpie des gaz en [kg/mol]
     
