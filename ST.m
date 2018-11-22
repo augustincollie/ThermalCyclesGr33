@@ -752,7 +752,7 @@ end
 %disponibles dans des tables issues du cours LMECA2160 - Combustion and
 %fuels.
 % OUTPUT : - Lhv : PCI du carburant exprimé en [kJ/kmol]
-function LHV = LHV(y,x)
+function [e_c LHV] = LHV(y,x)
     
     % Valeurs LHV en kJ/kmol
     LHV_CO = 282400;
@@ -779,6 +779,8 @@ function LHV = LHV(y,x)
 %     else
 %             %FORMULE DE BOIL
 %     end
+
+    e_c = 1.05*LHV; % "Element de thermodynamique technique", P.Wauters.
 end
 
 % Retourne l'exergie a un etat donne comme une difference avec 
