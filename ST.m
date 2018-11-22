@@ -612,15 +612,13 @@ sbleed
     % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
     % chaleur entre le combustible (CH4) et l'eau du circuit.
     
-    
     %Données utiles
-    lambda = comb.lambda;
-    Tsat_p2 = XSteam('Tsat_p',p(2));
+    Tsat_p2 = XSteam('Tsat_p',p(2))+273.15;
     h_2prime = XSteam('hL_p',p(2));
     h_2secnd = XSteam('hV_p',p(2));
     hLV_p2 = (h_2secnd - h_2prime);
     s_2prime = XSteam('sL_p',p(2));
-    s_2secnd = XSteam('sV_p',p(2));
+    s_2scnd = XSteam('sV_p',p(2));
     combustion.LHV = LHV(comb_y,comb_x); % [MJ/kg] Pouvoir Calorifique Inférieur du combustible
     %comb_Tmax
     %T_exhaust
@@ -635,66 +633,84 @@ sbleed
     %Combustible
     
     M_molComb = 0.012 + 0.001*comb_y + 0.016*comb_x;
-    PCI = LHV(comb_y,comb_x);
+    [e_c, PCI]= LHV(comb_x,comb_y);
     
     %Vecteurs des états du flux principal
-    t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)];
+    t_exch = [t(2),Tsat_p2,Tsat_p2,t(3)]
     p_exch = p(2);
     h_exch = [h(2), h_2prime, h_2secnd, h(3)];
-    s_exch = [s(2), s_2prime, s_2secnd, s(3)];
+    s_exch = [s(2), s_2prime, s_2scnd, s(3)];
     e_exch = Exergie(h_exch,s_exch);
     x_exch = [x(2), 0, 1, x(3)];
     
     %Calcul de l'échange de chaleur à l'échangeur (delta_h)
-    dh_exch = [h_exch(2)-h_exch(1), hLV_p2, h_exch(3)-h_exch(4)];
+    dh_exch = [h_exch(2)-h_exch(1), hLV_p2, h_exch(3)-h_exch(4)]
     
     %Evaluation de la composition des fumées
     %comb_y , comb_x, comb_lambda, comb_Tmax
-    [mass_O2f, mass_CO2f, mass_N2f, mass_H2Of, R_fum] = ComputeMassFraction(lambda,comb_x,comb_y);
+    [mass_O2f, mass_CO2f, mass_N2f, mass_H2Of, R_fum] = ComputeMassFraction(comb_lambda,comb_x,comb_y);
     MassFr = [mass_O2f mass_CO2f mass_N2f mass_H2Of];
     
-    %ON MATTE L'EVOLUTION DE Cpa ET Cpg
-    X = linspace(273.15,2000,10000);
-    Y = Cpg(MassFr,X);
-    Y2 = Cpa(X);
-    plot(X,Y,X,Y2)
     % Calcul des Cp moyen des fumees 
-    c_moy_22p = Cpg(MassFr,t_exch(1)+273.15,t_exch(2)+273.15); % Entre 2 et 2'
-    c_moy_2p2pp = Cpg(MassFr,t_exch(2)+273.15,t_exch(3)+273.15); % Entre 2' et 2''
-    c_moy_2pp3 = Cpg(MassFr,t_exch(3)+273.15,t_exch(4)+273.15); % Entre 2'' et 3
+    c_moy_22p = Cpg(MassFr,t_exch(1),t_exch(2)); % Entre 2 et 2'
+    c_moy_2p2pp = Cpg(MassFr,t_exch(2),t_exch(3)); % Entre 2' et 2''
+    c_moy_2pp3 = Cpg(MassFr,t_exch(3),t_exch(4)); % Entre 2'' et 3
     
     %Enthalpie des gaz en [kg/mol]
     
-    hWat = sum(dh);%Total de l'enthalpie cedee a l'eau [kJ/kg
+    T0 = T_0 + 273.15
+    hWat = sum(dh_exch);%Total de l'enthalpie cedee a l'eau [kJ/kg
     
-    %Recherche de T après l'echange de chaleur avec l'eau (
+    h1g = Cpg(MassFr,T0,comb_Tmax)*comb_Tmax; % Enthalpie des fumees a la temperature max de combustion
+    hOutg = Cpg(MassFr,T0,T_exhaust)*T_exhaust; % Enthalpie des fumées a la sortie de la cheminée
+    h1a = Cpa(0,T0)*T0; %Enthalpie de l'air a l'aspiration vers la Ch de Combustion
     
-    %hAir = ; %Enthalpie cedee a l'air alimentant la combustion
+    % Etat de reference de l'air de combustion
     
+    [Cpa_0,Ra] = Cpa(T0)
+    h0 = Cpa_0*(T0-273.15) % Par rapport a 0°C (p.118)
+    s0 = Cpa_0*log(T0/273.15)
+    h_aExch = h1g - sum(dh_exch) % Enthalpie echangee entre air et fumees
+    s_a = Cpa(T0,273.15)*log(T0/273.15) %Entropie de l'air à la combustion
+    e_r = (h_aExch - h0)- T0*(s_a - s0) %exergie des reactifs (ou l'exergie du combustible a ete negligee
     
+    %Calcul du vecteur MASSFLOW
     
-
-    %       -fum(1) = m_O2f  : massflow of O2 in exhaust gas [kg/s]
-%       -fum(2) = m_N2f  : massflow of N2 in exhaust gas [kg/s]
-%       -fum(3) = m_CO2f : massflow of CO2 in exhaust gas [kg/s]
-%       -fum(4) = m_H2Of : massflow of H2O in exhaust gas [kg/s] 
+    m_comb = m_tot *((hWat)/((1+comb_lambda*m_a1)*(h1g-hOutg)-PCI-h1g+(comb_lambda*m_a1*h1a)))
+    massflow(3) = m_comb % Débit de FIOULE necessaire.
+    massflow(1) = m_a1*massflow(3);
+    massflow(4) = massflow(1)+massflow(3);
     
+    %Vecteur combustion.fum
     
-    %Evaluation du débit de combustible nécessaire à la combustion
+    n_Comb = massflow(3)/M_molComb;
+    combustion.fum(1) = n_Comb*(comb_lambda-1)*(1+((comb_y-2*comb_x)/4))*(0.032);
+    combustion.fum(2) = n_Comb*comb_lambda*3.76*(1+((comb_y-2*comb_x)/4))*(0.028);
+    combustion.fum(3) = n_Comb*(0.012*0.032);
+    combustion.fum(4) = n_Comb*(comb_y/2)*0.018;
+        
+    %Structure Combustion
     
-    fracMol_CHyOx = fracMol_CO2f; %Stoechiométriquement identiques.  
+    combustion.LHV = PCI;
+    combustion.e_c = e_c;
+    combustion.lambda = comb_lambda;
+    combustion.Cp_g = Cpg(MassFr, t_exch(1),t_exch(4));
     
     
 %% RENDEMENTS
 % Energetique
-eta_gen = m_tot*(h(3)-h(2))/(m_comb*PCI);
+eta_gen = (m_tot*(h(3)-h(2)))/(massflow(3)*combustion.LHV);
 eta_cyclen = (HP+MBP)/(MBP-(h(5)-h(6))-(h(3)-h(4)) + (h(3)-h(2)));
 eta_toten = eta_mec*eta_gen*eta_cyclen;
 
 % Exergetique
-eta_combex = ef*(lambda*ma1 + 1)/ec;
-eta_chemnex = (ef - ech)/(ef-er);
-eta_transex = m_tot*((e(3)-e(2))+(e(6)-e(5)))/(eta_combex*eta_chemnex*m_comb*ec);
+    e_f = Cpg(MassFr, T_0,t_exch(4))*(t_exch(4)- T_0)-combustion.Cp_g*T_0*log(t_exch(4)/T_0); % le terme proportionnel à log(p_f/p_0) est annulé car p_f=p_0
+    e_exh = Cpg(MassFr, T_0,T_exhaust)*(T_exhaust- T_0)-combustion.Cp_g*T_0*log(T_exhaust/T_0); % meme remarque ligne précédente.
+    
+
+eta_combex = e_f*(comb_lambda*m_a1 + 1)/combustion.e_c;
+eta_chemnex = (e_f - e_exh)/(e_f-e_r);
+eta_transex = m_tot*((e(3)-e(2)))/(massflow(4)*(e_f-e_exh));
 eta_gex = eta_transex*eta_chemnex*eta_combex;
 eta_rotex = Pm/ePm;
 eta_cyclex = eta_rotex*ePm/(m_tot*(e(3)-e(2)));
