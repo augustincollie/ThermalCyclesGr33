@@ -515,11 +515,6 @@ if nsout > 0
     e(11) = Exergie(h(11),s(11));
 end
 
-tbleed
-pbleed
-xbleed
-hbleed
-sbleed
 %% FLUX MASSIQUES
 %Calcul des Xflow
 if nsout > 1
@@ -564,18 +559,18 @@ if nsout > 1
     DHRES(:,b) = 0;
     DHLIQ = DHliq*ones(1,n);
     DHLIQ(b+1:n,1:b) = 0;
-    DHLIQ(b+1:n,b) = 0
+    DHLIQ(b+1:n,b) = 0;
     DHBLEED = diag(DHbleed); 
     A = DHBLEED + DHRES - DHLIQ;
     b = DHliq;
-    Xflow = A\b
+    Xflow = A\b;
 elseif nsout ==1
     Xflow = (h(2)-h(7))/(hbleed(1,nsout)-h(2));
 else 
     %Rankin-Hirn
     Xflow = 0;
 end
-    1+sum(Xflow)
+
 %% Debit de l'installation
 % P_E = ((HP*flow + MP et BP * flow variables) - Pe*flow - Pa*flow -
 % Pb*flow)*eta_mec
@@ -604,6 +599,14 @@ m_tot = MASSFLOW(2);
 XMASSFLOW = MASSFLOW(2)*Xflow;
 
 
+%% Verif
+
+tbleed
+pbleed
+xbleed
+hbleed
+sbleed
+1+sum(Xflow)
 %% CHAMBRE DE COMBUSTION
 
     % Sur base de l'etat 2 et de l'etat 3, evaluation du transfert de
@@ -733,21 +736,33 @@ end
 %disponibles dans des tables issues du cours LMECA2160 - Combustion and
 %fuels.
 % OUTPUT : - Lhv : PCI du carburant exprimé en [kJ/kmol]
-function Lhv = LHV(y,x)
-    if (y == 0 && x == 0) %Carbon Graphite
-        Lhv = 393400;
-    elseif (y == 4 && x == 0) % Methane
-        Lhv = 802400;
-    elseif (y == 8/3 && x == 0) % Propane
-        Lhv = 2044400;
-    elseif (y == 0 && x == 1) % Carbon monoxyde
-        Lhv = 282400;
-    elseif (y == 3 && x == 0.5) % Ethanol
-        Lhv = 26900 ;
-        
-    else
-            %FORMULE DE BOIL
-    end
+function LHV = LHV(y,x)
+    
+    % Valeurs LHV en kJ/kmol
+    LHV_CO = 282400;
+    LHV_CH4 = 802400;
+    LHV_C = 393400;
+    LHV_H2Ovap = 241800;
+    
+    % Solide
+    a = x/(1+y/2);
+    
+    % LMECA2160 eq (4.87)
+    LHV = a*LHV_CO + a*(y/2)*LHV_H2Ovap + (1-a)*((1-y/4)*LHV_C + (y/4)*LHV_CH4);
+%     if (y == 0 && x == 0) %Carbon Graphite
+%         Lhv = 393400;
+%     elseif (y == 4 && x == 0) % Methane
+%         Lhv = 802400;
+%     elseif (y == 8/3 && x == 0) % Propane
+%         Lhv = 2044400;
+%     elseif (y == 0 && x == 1) % Carbon monoxyde
+%         Lhv = 282400;
+%     elseif (y == 3 && x == 0.5) % Ethanol
+%         Lhv = 26900 ;
+%         
+%     else
+%             %FORMULE DE BOIL
+%     end
 end
 
 % Retourne l'exergie a un etat donne comme une difference avec 
