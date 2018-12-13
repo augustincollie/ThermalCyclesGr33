@@ -8,8 +8,7 @@
 %           - T1 : Temperature finale/initiale
 % L'ordre des temperatures ne change rien.
 % N'accepte pas les temperatures <300K
-function [Cpg_m] = Cpg(M,T2,T1)
-    
+function [Cpg_m, Rg] = Cpg(M,T2,T1)
     if nargin == 3
         Tvec = linspace(T1,T2,100); % Travail avec un vecteur
     elseif nargin == 2
@@ -24,5 +23,6 @@ function [Cpg_m] = Cpg(M,T2,T1)
         Cpg_m = sum(Cpg_vec)/length(Tvec);
     elseif nargin == 2
         Cpg_m = Cpg_vec;
-    end    
+    end  
+    
 end

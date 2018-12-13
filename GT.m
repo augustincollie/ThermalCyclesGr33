@@ -9,10 +9,11 @@ function [ETA, DATEN, DATEX, DAT, MASSFLOW, COMBUSTION, FIG] = GT(P_e,options,di
 %         be activated)
 % P_E = electrical power output target [kW] OPTIONS is a structure
 % containing :
-%   -options.k_mec [-] : Shaft losses -options.T_0   [°C] : Reference
-%   temperature -options.T_ext [°C] : External temperature -options.r
-%   [-] : Comperssion ratio -options.k_cc  [-] : Coefficient of pressure
-%   losses due to combustion
+%   -options.k_mec [-] : Shaft losses 
+%   -options.T_0   [°C] : Reference temperature 
+%   -options.T_ext [°C] : External temperature 
+%   -options.r  [-] : Comperssion ratio 
+%   -options.k_cc  [-] : Coefficient of pressure losses due to combustion
 %                        chamber
 %   -options.T_3   [°C] : Temperature after combustion (before turbine)
 %   -option.eta_PiC[-] : Intern polytropic efficiency (Rendement
@@ -24,24 +25,30 @@ function [ETA, DATEN, DATEX, DAT, MASSFLOW, COMBUSTION, FIG] = GT(P_e,options,di
 %
 %OUPUTS :
 % ETA is a vector with :
-%   -eta(1) : eta_cyclen, cycle energy efficiency -eta(2) : eta_toten,
-%   overall energy efficiency -eta(3) : eta_cyclex, cycle exegy efficiency
-%   -eta(4) : eta_totex, overall exergie efficiency -eta(5) : eta_rotex,
-%   compressor-turbine exergy efficiency -eta(6) : eta_combex, Combustion
-%   exergy efficiency FYI : eta(i) \in [0;1] [-]
+%   -eta(1) : eta_cyclen, cycle energy efficiency 
+%   -eta(2) : eta_toten, overall energy efficiency 
+%   -eta(3) : eta_cyclex, cycle exegy efficiency
+%   -eta(4) : eta_totex, overall exergie efficiency 
+%   -eta(5) : eta_rotex, compressor-turbine exergy efficiency 
+%   -eta(6) : eta_combex, Combustion exergy efficiency 
+%   FYI : eta(i) \in [0;1] [-]
 % DATEN is a vector with :
-%   -daten(1) : perte_mec [kW] -daten(2) : perte_ech [kW]
+%   -daten(1) : perte_mec [kW] 
+%   -daten(2) : perte_ech [kW]
 % DATEX is a vector with :
-%   -datex(1) : perte_mec [kW] -datex(2) : perte_rotex [kW] -datex(3) :
-%   perte_combex [kW] -datex(4) : perte_echex  [kW]
+%   -datex(1) : perte_mec [kW] 
+%   -datex(2) : perte_rotex [kW] 
+%   -datex(3) : perte_combex [kW] 
+%   -datex(4) : perte_echex  [kW]
 % DAT is a matrix containing : dat = {T_1       , T_2       , T_3       ,
 % T_4; [°C]
 %        p_1       , p_2       , p_3       , p_4; [bar] h_1       , h_2
 %        , h_3       , h_4; [kJ/kg] s_1       , s_2       , s_3       ,
 %        s_4; [kJ/kg/K] e_1       , e_2       , e_3       , e_4;};[kJ/kg]
 % MASSFLOW is a vector containing :
-%   -massflow(1) = m_a, air massflow [kg/s] -massflow(2) = m_c, combustible
-%   massflow [kg/s] -massflow(3) = m_f, exhaust gas massflow [kg/s]
+%   -massflow(1) = m_a, air massflow [kg/s] 
+%   -massflow(2) = m_c, combustible massflow [kg/s] 
+%   -massflow(3) = m_f, exhaust gas massflow [kg/s]
 % 
 % COMBUSTION is a structure with :
 %   -combustion.LHV    : the Lower Heat Value of the fuel [kJ/kg]
@@ -63,17 +70,15 @@ function [ETA, DATEN, DATEX, DAT, MASSFLOW, COMBUSTION, FIG] = GT(P_e,options,di
 %
 
 %% Your Work
-% https://che.utah.edu/~geoff/air_poll/lectures_handouts/combustion_basics.pdf
-% Slide 13.
+
 close all;
 opt=optimset('display','off');
-% Exemple of how to use 'nargin' to check your number of inputs
 if nargin<3
     display=1;
    if nargin<2
        % Par defaut, prendre l'exemple p.126
-       options=struct('k_mec',0.015,'T_0',0,'T_ext',15,'r',18,'k_cc',0.95, ...
-           'T_3',1400,'eta_PiC',0.9,'eta_PiT',0.9);
+       options=struct('k_mec',0.015,'T_0',15,'T_ext',15,'r',10,'k_cc',0.95, ...
+           'T_3',1050,'eta_PiC',0.9,'eta_PiT',0.9);
        if nargin<1
            P_e=230e3;%230MW
        end
@@ -86,7 +91,7 @@ for d=1
     if isfield(options,'T_0')
         T0 = options.T_0;
     else
-        T0 = 0; % [°C]  
+        T0 = 15; % [°C]  
     end
     if isfield(options,'k_mec')
         k_mec = options.k_mec;
@@ -137,11 +142,7 @@ LHV = 50150; % Pour methane [kJ/kg] venant de slides S3
 y = 4;
 x = 0;
 ma1 = ((32 + 3.76*28)*(1+(y-2*x)/4)) / (12 + y + 16*x); % LMECA1855 p.133
-% kg/mol
-MmO2 = 2*16e-3;
-MmCO2 = (2*16+12)*1e-3;
-MmN2 = 2*14e-3;
-MmH2O = (2*1+16)*1e-3;
+
 
 %% Etat de reference et calculs de base
 % Tres bonne approximation que de tout considerer comme gaz ideal ! (p.116)
@@ -157,13 +158,11 @@ s0 = Cpa_0*log(T0/273.15);
 
 %% Etat 1 : Arrivee de l'air
 T(1) = T_ext+T0; % [K]
-%p(1) = 1.01325; % [bar] - pression atmospherique
 p(1) = 1;
 
-
-h(1) = Cpa(T(1))*(T(1)-T0);
-s(1) = Cpa(T(1))*log(T(1)/T0);
-e(1) = (h(1)-h0) - T0*(s(1)-s0);
+h(1) = Cpa(T(1),T0)*(T(1)-T0);
+s(1) = Cpa(T(1),T0)*log(T(1)/T0);
+e(1) = h(1) - T0*s(1);
 
 %% Etat 1-2 : Compression polytropique
 p(2) = r*p(1);
@@ -174,7 +173,7 @@ h12 = [h(1) zeros(1,19)];
 s12 = [s(1) zeros(1,19)];
 for i=2:length(T12)
     f = @(T2) T(1)*(p12(i)/p(1))^(Ra / ( eta_PiC*Cpa(T2,T(1)) )) - T2;
-    T12(i) = fsolve(f,400,opt);
+    T12(i) = fsolve(f,T12(i-1),opt);
     h12(i) = h12(i-1) + Cpa(T12(i))*(T12(i)-T12(i-1));
     s12(i) = s12(i-1) + Cpa(T12(i))*log(T12(i)/T12(i-1)) - Ra*log(p12(i)/p12(i-1));
 end
@@ -188,15 +187,6 @@ WmC = h(2)-h(1);
 p(3) = k_cc*p(2);
 T(3) = T3+273.15; % [K]
 
-%Generalement, en cas machine stationnaire, methane (CH4) utilise -- p.111
-
-%exp = r^(Ra / ( eta_PiC*Cpa(T(2),T(1)) ));
-
-% On tente de trouver la valeur de lambda
-% On egalise l'equation 3.9 (p115) a l'equation 3.26 (p119)
-% f = @(L) Cpa(T(2),T(1))*T(1)*((1+1/(L*ma1)) * T(3)/T(1) * ...
-%     Cpg(L,T(3),T(2))/Cpa(T(2),T(1)) - exp) - LHV/(L*ma1);
-%f = @(L) (1+LHV/((L*ma1+1)*Cpg(L,T(3),T(2))*T(2)))-(T(3)/T(2));
 lambda = fsolve(@ComputeLambda,2.5,opt);
 [MO2, MCO2, MN2, MH2O, Rg] = ComputeMassFraction(lambda,x,y);
 MF = [MO2 MCO2 MN2 MH2O];
@@ -224,7 +214,7 @@ h34 = [h(3) zeros(1,19)];
 s34 = [s(3) zeros(1,19)];
 for i=2:length(T34)
     f = @(T4) T(3)*(p34(i)/p(3))^(eta_PiT*Rg/Cpg(MF,T4,T(3))) - T4; % p.119
-    T34(i) = fsolve(f,400,opt);
+    T34(i) = fsolve(f,T34(i-1),opt);      
     h34(i) = h34(i-1) + Cpg(MF,T34(i),T34(i-1))*(T34(i)-T34(i-1));
     s34(i) = s34(i-1) + Cpg(MF,T34(i),T34(i-1))*log(T34(i)/T34(i-1)) - Rg*log(p34(i)/p34(i-1));
 end
@@ -247,9 +237,7 @@ PmT = WmT*m_g;
 PmC = WmC*m_a;
 
 %% Rendements et pertes
-S288 = 288*(183.1/16); % Entropie standard du combustible [kJ/kg/K]
-HHV = 55695; % [kJ/kg] venant de slides S3
-ec = HHV-S288;
+ec = 52215;
 Pmec = k_mec*(PmT+PmC);
 Qcomb = (1+1/(lambda*ma1))*h(3) - h(2);
 Wm = (1+1/(lambda*ma1))*(WmT) - (WmC);
@@ -258,11 +246,11 @@ eta_cyclen = (Wm) / (Qcomb);
 eta_toten = (PmT-PmC)/(m_c*LHV);
 eta_cyclex = (PmT-PmC) / (m_g*e(3)-m_a*e(2));
 eta_totex = P_e/(m_c*ec);
+eta_combex = (m_g*e(3)-m_a*e(2))/(m_c*ec);
 % Turbine et compresseur
 eta_cex = (e(2)-e(1))/(h(2)-h(1));
 eta_tex = (h(3)-h(4))/(e(3)-e(4));
 eta_rotex = (PmT-PmC)/(m_g*(e(3)-e(4)) - m_a*(e(2)-e(1)));
-eta_combex = (m_g*e(3)-m_a*e(2))/(m_c*ec);
 
 
 Pechen = (Qcomb-Wm)*m_g;
@@ -280,49 +268,49 @@ DATEX = [Pmec Protex Pcombex Pechex];
 MASSFLOW = X;
 COMBUSTION = struct('LHV',LHV,'e_c',ec,'lambda',lambda,'Cp_g',Cpg(MF,400),'fum',fum);
 
-%% Verif'
-% T-T0
-% p
-% lambda
-% h
-% s
-% e
-% PmT
-% PmC
-% X
-% COMBUSTION.fum/m_g
-
 %% PLOT
+hdraw = [h12 h23 h34];
+sdraw = [s12 s23 s34];
+Tdraw = [T12 T23 T34];
 if display == 1
-    hdraw = [h12 h23 h34];
-    sdraw = [s12 s23 s34];
-    Tdraw = [T12 T23 T34];
     FIG(1) = figure; % h-s
-    plot(sdraw,hdraw);
+    plot(sdraw,hdraw,'r');
+    hold on;
+    plot(DAT(4,:),DAT(3,:),'*')
+    text(DAT(4,:),DAT(3,:),['  1';'  2';'  3';'  4'])
+    hold off;
     title('Diagramme h-s de la turbine à gaz')
     xlabel('Entropie [kJ/kg/K]')
     ylabel('Enthalpie [kJ/kg]')
-    FIG(2) = figure;
-    plot(sdraw, Tdraw); % T-s
+    
+    FIG(2) = figure; % T-s
+    plot(sdraw, Tdraw,'r');
+    hold on;
+    plot(DAT(4,:),DAT(1,:),'*')
+    text(DAT(4,:),DAT(1,:),['  1';'  2';'  3';'  4'])
+    hold off;
     title('Diagramme T-s de la turbine à gaz')
     xlabel('Entropie [kJ/kg/K]')
     ylabel('Température [°K]')
+    
     FIG(3) = figure; % Energie
-    legend = {sprintf('Pertes a l''échappement \n %.1f MW',Pechen/1000), ...
-        sprintf('Pertes mécaniques \n %.1f MW',Pmec/1000), ...
-        sprintf('Puissance effective \n %.1f MW',P_e/1000)};
+    legend = {sprintf('Pertes a \n l''échappement \n %.1f MW',Pechen/1000), ...
+        sprintf('Pertes \n mécaniques \n %.1f MW',Pmec/1000), ...
+        sprintf('Puissance \n effective \n %.1f MW',P_e/1000)};
     pie([Pechen Pmec P_e],legend);
     title('Flux d''énergie de la turbine à gaz');
+    
     FIG(4) = figure; % Exergie
-    legend = {sprintf('Irréversibilité de la combustion \n %.1f MW',Pcombex/1000),...
-        sprintf('Pertes mécaniques \n %.1f MW',Pmec/1000), ...
-        sprintf('Pertes à l''échappement \n %.1f MW',Pechex/1000), ...
-        sprintf('Irréversibilités turb. et compr. \n %.1f MW',Protex/1000)...
-        sprintf('Puissance effective \n %.1f MW',P_e/1000)};
+    legend = {sprintf('Irréversibilité de \n la combustion \n %.1f MW',Pcombex/1000),...
+        sprintf('Pertes \n mécaniques \n %.1f MW',Pmec/1000), ...
+        sprintf('Pertes à \n l''échappement \n %.1f MW',Pechex/1000), ...
+        sprintf('Irréversibilités \n turb. et compr. \n %.1f MW',Protex/1000)...
+        sprintf('Puissance \n effective \n %.1f MW',P_e/1000)};
     pie([Pcombex Pmec Pechex Protex P_e],legend);  
     title('Flux d''exergie de la turbine à gaz');
+else
+    FIG = [];
 end
-
 
 %% NESTED FUNCTIONS
 
@@ -333,16 +321,7 @@ end
 function f = ComputeLambda(L)
     [MO2, MCO2, MN2, MH2O, Rg] = ComputeMassFraction(L,x,y);
     MassFr = [MO2 MCO2 MN2 MH2O];
-    
-    Tvec = linspace(T(3),T(2),100);
-    
-    CpO2 = janaf('c','O2',Tvec);
-    CpCO2 = janaf('c','CO2',Tvec);
-    CpN2 = janaf('c','N2',Tvec);
-    CpH2O = janaf('c','H2O',Tvec);
-    Cpg_vec = MassFr(1)*CpO2 + MassFr(2)*CpCO2 + MassFr(3)*CpN2 + MassFr(4)*CpH2O; % Vecteur ou scalaire selon T
-    
-    Cpg_m = sum(Cpg_vec)/length(Tvec);
+    Cpg_m = Cpg(MassFr,T(3),T(2));
 
     f = Cpg_m*(T(3)-T(2))+(1/(L*ma1))*(Cpg_m*(T(3)-T0)-LHV);
 end

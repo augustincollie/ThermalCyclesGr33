@@ -10,13 +10,7 @@
 % commise, le Cpa ne varie presque pas entre 273.15 et 300K)
 function [Cpa_m, Ra] = Cpa(T2,T1)
     
-    if T2 < 300
-        T2 = 300;
-    end
     if nargin > 1
-        if T1 < 300
-            T1 = 300;
-        end
     end
     MmN2 = 0.028;
     MmO2 = 0.032;
