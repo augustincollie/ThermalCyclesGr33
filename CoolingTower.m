@@ -164,7 +164,7 @@ end
     Init = 1e04*Inc; %Initial iteration values of Inc
     
 %     options = optimoptions('fsolve','OptimalityTolerance',1e-04);
-    Ans = fsolve(@FunS, Init); %,options
+    Ans = fsolve(@FunS, Init,optimset('display','off')); %,options
     
     mDotAir = Ans(1);
     T_e1 = Ans(2);
